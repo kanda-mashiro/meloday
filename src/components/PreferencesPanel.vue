@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { usePreferences, type SizeStep } from '../composables/usePreferences'
 import { useDarkMode } from '../composables/useDarkMode'
+import ColorPicker from './ColorPicker.vue'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
-const { prefs, accents, columnOptions, reset } = usePreferences()
+const { prefs, accents, columnOptions, reset, setCustomAccent } = usePreferences()
 const { isDark, setDark } = useDarkMode()
 
 const sizes: SizeStep[] = ['S', 'M', 'L']
+
+const DEFAULT_CUSTOM = '#d2912a'
+function selectCustom(): void {
+  setCustomAccent(prefs.customAccent || DEFAULT_CUSTOM)
+}
 </script>
 
 <template>
@@ -23,7 +29,7 @@ const sizes: SizeStep[] = ['S', 'M', 'L']
 
       <div class="prefs__body">
         <!-- Accent color -->
-        <section class="prefs__row">
+        <section class="prefs__row prefs__row--accent">
           <span class="prefs__label">Accent</span>
           <div class="prefs__swatches">
             <button
@@ -37,7 +43,35 @@ const sizes: SizeStep[] = ['S', 'M', 'L']
               type="button"
               @click="prefs.accent = a.key"
             />
+            <button
+              class="prefs__swatch prefs__swatch--custom"
+              :class="{ '-active': prefs.accent === 'custom' }"
+              :style="prefs.customAccent ? { background: prefs.customAccent } : {}"
+              title="自定义颜色"
+              aria-label="自定义颜色"
+              type="button"
+              @click="selectCustom"
+            >
+              <svg
+                v-if="!prefs.customAccent"
+                class="prefs__swatch-plus"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           </div>
+          <ColorPicker
+            v-if="prefs.accent === 'custom'"
+            class="prefs__picker"
+            :model-value="prefs.customAccent || '#d2912a'"
+            @update:model-value="setCustomAccent"
+          />
         </section>
 
         <!-- Columns -->
@@ -122,8 +156,8 @@ const sizes: SizeStep[] = ['S', 'M', 'L']
         <section class="prefs__row">
           <span class="prefs__label">Display</span>
           <div class="seg">
-            <button class="seg__btn" :class="{ '-active': !isDark }" type="button" @click="setDark(false)">☀ Light</button>
-            <button class="seg__btn" :class="{ '-active': isDark }" type="button" @click="setDark(true)">☾ Dark</button>
+            <button class="seg__btn" :class="{ '-active': !isDark }" type="button" @click="setDark(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.2M12 19.8V22M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2 12h2.2M19.8 12H22M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg> Light</button>
+            <button class="seg__btn" :class="{ '-active': isDark }" type="button" @click="setDark(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg> Dark</button>
           </div>
         </section>
 
@@ -220,6 +254,14 @@ const sizes: SizeStep[] = ['S', 'M', 'L']
   border-bottom: 1px solid var(--divider);
 }
 
+/* The accent row stacks (label, then a full-width swatch row + inline picker)
+   so all swatches fit on one line instead of wrapping awkwardly. */
+.prefs__row--accent {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.7rem;
+}
+
 .prefs__label {
   font-size: 0.9rem;
   font-weight: 600;
@@ -230,7 +272,7 @@ const sizes: SizeStep[] = ['S', 'M', 'L']
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .prefs__swatch {
@@ -252,6 +294,25 @@ const sizes: SizeStep[] = ['S', 'M', 'L']
   box-shadow: 0 0 0 2px var(--panel-bg) inset;
 }
 
+/* The custom-color swatch is a neutral "+" until a color is picked; after that
+   it just shows the chosen color (no garish rainbow wheel). */
+.prefs__swatch--custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--button-active-bg);
+  color: var(--aside-text);
+}
+
+.prefs__swatch-plus {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.prefs__picker {
+  margin-top: 0.1rem;
+}
+
 .seg {
   display: inline-flex;
   border: 1px solid var(--main-border-light);
@@ -270,6 +331,10 @@ const sizes: SizeStep[] = ['S', 'M', 'L']
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  justify-content: center;
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 

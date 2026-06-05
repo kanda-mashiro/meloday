@@ -88,7 +88,10 @@ function setLink(): void {
   }
 }
 
-const TOOLBAR_GROUPS: { items: { key: string; label: string; title: string; run: () => void; isActive: () => boolean; disabled?: () => boolean }[] }[] = [
+const TASK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><path d="M9 11l3 3L20 6"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>'
+const LINK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.7-1.7"/></svg>'
+
+const TOOLBAR_GROUPS: { items: { key: string; label: string; svg?: string; title: string; run: () => void; isActive: () => boolean; disabled?: () => boolean }[] }[] = [
   {
     items: [
       { key: 'bold', label: 'B', title: '加粗 (⌘B)', run: () => editor.value?.chain().focus().toggleBold().run(), isActive: () => active('bold') },
@@ -108,14 +111,14 @@ const TOOLBAR_GROUPS: { items: { key: string; label: string; title: string; run:
     items: [
       { key: 'bullet', label: '•', title: '无序列表', run: () => editor.value?.chain().focus().toggleBulletList().run(), isActive: () => active('bulletList') },
       { key: 'ordered', label: '1.', title: '有序列表', run: () => editor.value?.chain().focus().toggleOrderedList().run(), isActive: () => active('orderedList') },
-      { key: 'task', label: '☑', title: '待办列表', run: () => editor.value?.chain().focus().toggleTaskList().run(), isActive: () => active('taskList') },
+      { key: 'task', label: 'Task', svg: TASK_SVG, title: '待办列表', run: () => editor.value?.chain().focus().toggleTaskList().run(), isActive: () => active('taskList') },
     ],
   },
   {
     items: [
       { key: 'quote', label: '“', title: '引用', run: () => editor.value?.chain().focus().toggleBlockquote().run(), isActive: () => active('blockquote') },
       { key: 'codeblock', label: '{}', title: '代码块', run: () => editor.value?.chain().focus().toggleCodeBlock().run(), isActive: () => active('codeBlock') },
-      { key: 'link', label: '🔗', title: '链接', run: setLink, isActive: () => active('link') },
+      { key: 'link', label: 'Link', svg: LINK_SVG, title: '链接', run: setLink, isActive: () => active('link') },
       { key: 'hr', label: '―', title: '分割线', run: () => editor.value?.chain().focus().setHorizontalRule().run(), isActive: () => false },
     ],
   },
@@ -144,7 +147,7 @@ const TOOLBAR_GROUPS: { items: { key: string; label: string; title: string; run:
           :aria-pressed="btn.isActive()"
           :disabled="btn.disabled ? btn.disabled() : false"
           @click="btn.run()"
-        >{{ btn.label }}</button>
+        ><span v-if="btn.svg" class="ne__btn-ico" v-html="btn.svg"></span><template v-else>{{ btn.label }}</template></button>
       </template>
     </div>
 
@@ -181,7 +184,7 @@ const TOOLBAR_GROUPS: { items: { key: string; label: string; title: string; run:
         :class="{ '-active': active('link') }"
         title="链接"
         @click="setLink()"
-      >🔗</button>
+      ><span class="ne__btn-ico" v-html="LINK_SVG"></span></button>
     </BubbleMenu>
 
     <EditorContent class="ne__content" :editor="editor" />
@@ -231,6 +234,10 @@ const TOOLBAR_GROUPS: { items: { key: string; label: string; title: string; run:
   line-height: 1;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ne__btn-ico {
+  display: inline-flex;
 }
 
 .ne__btn:hover:not(:disabled) {

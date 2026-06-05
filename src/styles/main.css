@@ -45,9 +45,8 @@
   --divider: #2c2c33;
   --rule: rgba(255, 255, 255, 0.08);
   --header-text: #c6c9d0;
-  --highlight-text: #e8b552;
-  --accent: #e8b552;
-  --accent-soft: rgba(232, 181, 82, 0.1);
+  /* --accent / --highlight-text / --accent-soft are owned by usePreferences
+     (inline on <html>) so the user's accent applies in dark mode too. */
   --disabled-text: #6c6f78;
   --aside-text: #9a9da6;
   --button-text: #c6c9d0;
@@ -89,9 +88,6 @@
     --divider: #e3e4e8;
     --rule: rgba(22, 22, 26, 0.08);
     --header-text: #24282f;
-    --highlight-text: var(--amber-strong);
-    --accent: var(--amber);
-    --accent-soft: rgba(210, 145, 42, 0.07);
     --disabled-text: #9499a3;
     --aside-text: #545b68;
     --button-text: #3a404b;

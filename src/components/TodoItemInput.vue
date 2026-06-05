@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useTodoStore } from '../composables/useTodoStore'
 import { buildLabel, tagHue } from '../lib/tags'
 
@@ -14,6 +14,17 @@ const tags = ref<string[]>([])
 const text = ref('')
 const mode = ref<Mode>('body')
 const inputEl = ref<HTMLInputElement | null>(null)
+
+// A leading '#' or fullwidth '＃' (what a Chinese IME produces) starts a tag.
+// The keydown handler catches the keypress, but IME-inserted punctuation can
+// slip past it, so this also converts a marker that lands at the start of the
+// body — then strips it, since the marker itself isn't part of the tag.
+watch(text, (val) => {
+  if (mode.value === 'body' && (val[0] === '#' || val[0] === '＃')) {
+    mode.value = 'tag'
+    text.value = val.slice(1)
+  }
+})
 
 const placeholder = computed(() => {
   if (mode.value === 'tag') return 'tag… (Enter to seal)'
@@ -43,7 +54,7 @@ function onKeydown(e: KeyboardEvent): void {
   }
 
   // '#' on an empty field enters tag mode (the '#' itself isn't typed).
-  if (e.key === '#' && mode.value === 'body' && text.value === '') {
+  if ((e.key === '#' || e.key === '＃') && mode.value === 'body' && text.value === '') {
     e.preventDefault()
     mode.value = 'tag'
     return

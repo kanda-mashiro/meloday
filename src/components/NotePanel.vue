@@ -115,7 +115,7 @@ function onClose(): void {
   <div class="note" :class="{ '-open': activeItem !== null }">
     <div class="note__scrim" @click="onClose" />
 
-    <aside class="note__panel" role="dialog" aria-label="Note" @keydown.esc="onClose">
+    <aside class="note__panel" role="dialog" aria-label="Note" @keydown.esc.stop="onClose">
       <header class="note__head">
         <span class="note__title"><template
           v-for="(seg, i) in titleSegments"

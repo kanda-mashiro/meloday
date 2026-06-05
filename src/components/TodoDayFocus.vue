@@ -1,45 +1,38 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import type { DayList } from '../types/todo'
 import { usePreferences } from '../composables/usePreferences'
-import { getTime, parseLabelRich } from '../lib/time'
+import { useFocusSession } from '../composables/useFocusSession'
+import { useNotes } from '../composables/useNotes'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth } from '../lib/date'
 import TodoList from './TodoList.vue'
 
 const props = defineProps<{ day: DayList }>()
-const { prefs } = usePreferences()
+const { prefs, exitFocus } = usePreferences()
+const focusSession = useFocusSession()
+const notes = useNotes()
+
+// Esc leaves focus mode (back to a multi-day view). A focus session or note
+// drawer layered on top handles Esc first (and stops it), so this only fires
+// when the bare focus card is showing.
+function onFocusKey(e: KeyboardEvent): void {
+  if (
+    e.key === 'Escape' &&
+    prefs.columns === 1 &&
+    !focusSession.target.value &&
+    !notes.activeItem.value
+  ) {
+    e.preventDefault()
+    exitFocus()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onFocusKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onFocusKey))
 
 const subline = computed(
   () => `${formatMonth(props.day.date)} ${formatDayOfMonth(props.day.date)}`,
 )
 const weekday = computed(() => formatDayOfWeek(props.day.date))
-
-// Most tasks have no time, so the list is the hero. The few that DO carry a
-// time get pulled into a thin glanceable "schedule" strip up top — your fixed
-// commitments at a glance, not a big mostly-empty calendar.
-interface Slot {
-  id: string
-  start: number
-  time: string
-  text: string
-}
-const schedule = computed<Slot[]>(() => {
-  const out: Slot[] = []
-  for (const item of props.day.items) {
-    if (item.done) continue
-    const t = getTime(item.label)
-    if (!t) continue
-    const rich = parseLabelRich(item.label)
-    const time = rich.segments.find((s) => s.kind === 'time')?.text ?? ''
-    const text = rich.segments
-      .filter((s) => s.kind === 'text')
-      .map((s) => s.text)
-      .join('')
-      .trim()
-    out.push({ id: item.id, start: t.start, time, text })
-  }
-  return out.sort((a, b) => a.start - b.start)
-})
 </script>
 
 <template>
@@ -49,14 +42,6 @@ const schedule = computed<Slot[]>(() => {
         <span class="focus__sub">{{ subline }}</span>
         <h2 class="focus__weekday">{{ weekday }}</h2>
       </header>
-
-      <div v-if="schedule.length" class="focus__schedule">
-        <span class="focus__schedule-label">今日日程</span>
-        <span v-for="s in schedule" :key="s.id" class="focus__slot">
-          <span class="focus__slot-time">{{ s.time }}</span>
-          <span class="focus__slot-text">{{ s.text || '—' }}</span>
-        </span>
-      </div>
 
       <div class="focus__list" :class="{ ruled: prefs.showLines }">
         <TodoList :list-id="day.id" :items="day.items" :focusable="true" />
@@ -121,50 +106,12 @@ const schedule = computed<Slot[]>(() => {
   color: var(--highlight-text);
 }
 
-/* Thin schedule strip — only the timed items, sorted by time. */
-.focus__schedule {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.9rem;
-  margin: 0.5rem 0 1.1rem;
-  padding: 0.55rem 0.8rem;
-  border-radius: 8px;
-  background: var(--accent-soft);
-}
-
-.focus__schedule-label {
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--aside-text);
-}
-
-.focus__slot {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  max-width: 100%;
-}
-
-.focus__slot-time {
-  flex: 0 0 auto;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--highlight-text);
-}
-
-.focus__slot-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--main-text);
-}
-
 .focus__list {
   margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  /* A tall click target: tapping the empty space below the items adds a todo
+     (the card is otherwise only as tall as its content). */
+  min-height: 55vh;
 }
 </style>

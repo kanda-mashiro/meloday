@@ -12,6 +12,8 @@ export interface Accent {
 
 export interface Preferences {
   accent: string
+  /** Hex used when `accent === 'custom'`. */
+  customAccent?: string
   columns: number
   textSize: SizeStep
   spacing: SizeStep
@@ -50,6 +52,7 @@ const STORAGE_KEY = 'my-todo-prefs'
 function defaults(): Preferences {
   return {
     accent: 'amber',
+    customAccent: undefined,
     columns: 7,
     textSize: 'M',
     spacing: 'M',
@@ -75,20 +78,41 @@ function load(): Preferences {
 
 const prefs = reactive<Preferences>(load())
 
+// Remember the last multi-day column count so Esc can restore it when leaving
+// the single-day focus view.
+let prevColumns = prefs.columns === 1 ? 3 : prefs.columns
+
 function accentFor(key: string): Accent {
   return ACCENTS.find((a) => a.key === key) ?? ACCENTS[0]
+}
+
+// A custom hex's faint "soft" tint (used for --accent-soft).
+function hexToSoft(hex: string): string {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  const r = parseInt(full.slice(0, 2), 16) || 0
+  const g = parseInt(full.slice(2, 4), 16) || 0
+  const b = parseInt(full.slice(4, 6), 16) || 0
+  return `rgba(${r}, ${g}, ${b}, 0.1)`
 }
 
 // Push the appearance-related preferences into CSS custom properties.
 function apply(): void {
   if (typeof document === 'undefined') return
   const root = document.documentElement.style
-  const accent = accentFor(prefs.accent)
-  root.setProperty('--accent', accent.color)
-  root.setProperty('--highlight-text', accent.color)
-  root.setProperty('--accent-soft', accent.soft)
+  const useCustom = prefs.accent === 'custom' && !!prefs.customAccent
+  const color = useCustom ? (prefs.customAccent as string) : accentFor(prefs.accent).color
+  const soft = useCustom ? hexToSoft(prefs.customAccent as string) : accentFor(prefs.accent).soft
+  root.setProperty('--accent', color)
+  root.setProperty('--highlight-text', color)
+  root.setProperty('--accent-soft', soft)
   root.setProperty('--font-size', FONT_SIZE[prefs.textSize])
   root.setProperty('--line-h', LINE_HEIGHT[prefs.spacing])
+}
+
+/** Leave the single-day focus view, restoring the previous multi-day count. */
+function exitFocus(): void {
+  prefs.columns = prevColumns
 }
 
 let initialized = false
@@ -109,6 +133,13 @@ function init(): void {
     },
     { deep: true },
   )
+
+  watch(
+    () => prefs.columns,
+    (n) => {
+      if (n !== 1) prevColumns = n
+    },
+  )
 }
 
 init()
@@ -118,11 +149,18 @@ export function usePreferences(): {
   accents: Accent[]
   columnOptions: readonly number[]
   reset: () => void
+  exitFocus: () => void
+  setCustomAccent: (hex: string) => void
 } {
   return {
     prefs,
     accents: ACCENTS,
     columnOptions: COLUMN_OPTIONS,
     reset: () => Object.assign(prefs, defaults()),
+    exitFocus,
+    setCustomAccent: (hex: string) => {
+      prefs.customAccent = hex
+      prefs.accent = 'custom'
+    },
   }
 }
