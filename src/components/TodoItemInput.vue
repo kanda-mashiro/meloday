@@ -45,6 +45,11 @@ function onBlur(): void {
 }
 
 function onKeydown(e: KeyboardEvent): void {
+  // While an IME is composing, the keys belong to it (Backspace edits the
+  // half-typed text, Enter commits a candidate, etc.). Running our shortcuts
+  // here mangles the composition — bail until it's committed.
+  if (e.isComposing || e.keyCode === 229) return
+
   if (e.key === 'Escape') {
     text.value = ''
     tags.value = []

@@ -40,8 +40,25 @@ function onToggle(): void {
   store.checkItem({ id: props.item.id, done: !props.item.done })
 }
 
+// The stored label uses pipe form ("#tag | text") so multi-word tags survive.
+// When editing, drop the pipe if every tag is a single word (the common case),
+// so the separator doesn't leak into the editor; multi-word tags keep it.
+function toEditForm(label: string): string {
+  const pipe = label.indexOf('|')
+  if (pipe === -1 || !label.slice(0, pipe).includes('#')) return label
+  const names = label
+    .slice(0, pipe)
+    .split('#')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (names.some((n) => /\s/.test(n))) return label
+  const body = label.slice(pipe + 1).replace(/^\s+/, '')
+  const tagPart = names.map((n) => `#${n}`).join(' ')
+  return body ? `${tagPart} ${body}` : tagPart
+}
+
 async function startEditing(): Promise<void> {
-  draft.value = props.item.label
+  draft.value = toEditForm(props.item.label)
   editing.value = true
   await nextTick()
   inputEl.value?.focus()
@@ -148,7 +165,11 @@ function remove(): void {
       title="Delete"
       aria-label="Delete"
       @click.stop="remove"
-    >×</button>
+    >
+      <svg viewBox="0 0 16 16" class="todo-item__delete-glyph" aria-hidden="true">
+        <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -334,6 +355,9 @@ function remove(): void {
 .todo-item__delete {
   flex: 0 0 auto;
   visibility: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.3rem;
   height: 1.3rem;
   padding: 0;
@@ -341,9 +365,16 @@ function remove(): void {
   border-radius: 4px;
   background: transparent;
   color: var(--disabled-text);
-  font-size: 1.15rem;
-  line-height: 1;
   cursor: pointer;
+}
+
+.todo-item__delete-glyph {
+  width: 0.85rem;
+  height: 0.85rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
 }
 
 .todo-item__delete:hover {
