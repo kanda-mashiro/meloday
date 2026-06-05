@@ -1,0 +1,29 @@
+[package]
+name = "mytodo-capture"
+version = "0.1.0"
+description = "MyTodo desktop quick-capture"
+edition = "2021"
+
+[lib]
+name = "mytodo_capture_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[lints.rust]
+# tauri-nspanel's panel_delegate! macro expands the old `objc` crate's `class!`
+# macro, which emits unexpected_cfgs from this crate's span. We use no custom
+# cfg names of our own, so silencing this crate-wide hides only that noise.
+unexpected_cfgs = "allow"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-global-shortcut = "2"
+
+# macOS: convert the capture window into an NSPanel so it can float over
+# fullscreen apps (Spotlight/Raycast-style). A plain always-on-top window cannot
+# reliably overlay native-fullscreen spaces — setCollectionBehavior on a normal
+# window is documented to fail in release builds (tauri-apps/tauri#5566).
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2" }

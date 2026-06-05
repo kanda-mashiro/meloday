@@ -1,0 +1,285 @@
+:root {
+  --white: #fefefe;
+  --black: #16161a;
+  --paper: #fcfcfa;
+  --grey1: #5b6472;
+  --grey2: #aeb4bd;
+  --grey3: #d6d8dd;
+  --grey4: #eceef1;
+
+  /* Warm amber accent (our own twist on the TeuxDeux look) */
+  --amber: #d2912a;
+  --amber-strong: #b8771a;
+
+  /* Baseline grid height — every todo row + ruled line snaps to this */
+  --line-h: 2.5rem;
+
+  /* Light UI mappings */
+  --main-text: var(--black);
+  --main-bg: var(--paper);
+  --panel-bg: var(--paper);
+  --main-border: var(--grey1);
+  --main-border-light: var(--grey3);
+  --divider: #e3e4e8;
+  --rule: rgba(22, 22, 26, 0.08);
+  --header-text: #24282f;
+  --highlight-text: var(--amber-strong);
+  --accent: var(--amber);
+  --accent-soft: rgba(210, 145, 42, 0.07);
+  --disabled-text: #9499a3;
+  --aside-text: #545b68;
+  --button-text: #3a404b;
+  --button-bg: transparent;
+  --button-active-text: var(--black);
+  --button-active-bg: var(--grey4);
+  --button-highlight-text: var(--amber-strong);
+}
+
+/* Manual inversion (dark) when base scheme is light */
+.-invertcolorscheme {
+  --main-text: #f3f3f5;
+  --main-bg: #16161a;
+  --panel-bg: #1c1c21;
+  --main-border: var(--grey2);
+  --main-border-light: #34343c;
+  --divider: #2c2c33;
+  --rule: rgba(255, 255, 255, 0.08);
+  --header-text: #c6c9d0;
+  --highlight-text: #e8b552;
+  --accent: #e8b552;
+  --accent-soft: rgba(232, 181, 82, 0.1);
+  --disabled-text: #6c6f78;
+  --aside-text: #9a9da6;
+  --button-text: #c6c9d0;
+  --button-bg: transparent;
+  --button-active-text: #ffffff;
+  --button-active-bg: #2c2c33;
+  --button-highlight-text: #e8b552;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --main-text: #f3f3f5;
+    --main-bg: #16161a;
+    --panel-bg: #1c1c21;
+    --main-border: var(--grey2);
+    --main-border-light: #34343c;
+    --divider: #2c2c33;
+    --rule: rgba(255, 255, 255, 0.08);
+    --header-text: #c6c9d0;
+    --highlight-text: #e8b552;
+    --accent: #e8b552;
+    --accent-soft: rgba(232, 181, 82, 0.1);
+    --disabled-text: #6c6f78;
+    --aside-text: #9a9da6;
+    --button-text: #c6c9d0;
+    --button-bg: transparent;
+    --button-active-text: #ffffff;
+    --button-active-bg: #2c2c33;
+    --button-highlight-text: #e8b552;
+  }
+
+  /* Re-inversion back to light when toggled while base scheme is dark */
+  .-invertcolorscheme {
+    --main-text: var(--black);
+    --main-bg: var(--paper);
+    --panel-bg: var(--paper);
+    --main-border: var(--grey1);
+    --main-border-light: var(--grey3);
+    --divider: #e3e4e8;
+    --rule: rgba(22, 22, 26, 0.08);
+    --header-text: #24282f;
+    --highlight-text: var(--amber-strong);
+    --accent: var(--amber);
+    --accent-soft: rgba(210, 145, 42, 0.07);
+    --disabled-text: #9499a3;
+    --aside-text: #545b68;
+    --button-text: #3a404b;
+    --button-bg: transparent;
+    --button-active-text: var(--black);
+    --button-active-bg: var(--grey4);
+    --button-highlight-text: var(--amber-strong);
+  }
+}
+
+/* Global reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, Helvetica, 'Helvetica Neue',
+    Roboto, sans-serif;
+  font-size: var(--font-size, 15px);
+  line-height: 1.4;
+  color: var(--main-text);
+  background: var(--main-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol,
+li {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Ruled-paper backdrop — faint horizontal lines on the baseline grid.
+   Applied to list bodies so even empty columns read as lined paper. */
+.ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--line-h) - 1px),
+    var(--rule) calc(var(--line-h) - 1px),
+    var(--rule) var(--line-h)
+  );
+}
+
+/* Inline tag chips — hue comes from --tag-h (set per chip).
+   Light defaults here; dark variants mirror the theme system below. */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0.12em;
+  padding: 0.02em 0.5em;
+  border-radius: 999px;
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+  background: hsl(var(--tag-h, 40) 60% 48% / 0.14);
+  color: hsl(var(--tag-h, 40) 58% 34%);
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.tag-chip:hover {
+  background: hsl(var(--tag-h, 40) 60% 48% / 0.26);
+}
+
+.tag-chip.-on {
+  box-shadow: inset 0 0 0 1.5px hsl(var(--tag-h, 40) 60% 45%);
+  background: hsl(var(--tag-h, 40) 60% 48% / 0.3);
+}
+
+.-invertcolorscheme .tag-chip {
+  background: hsl(var(--tag-h, 40) 55% 60% / 0.2);
+  color: hsl(var(--tag-h, 40) 70% 72%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tag-chip {
+    background: hsl(var(--tag-h, 40) 55% 60% / 0.2);
+    color: hsl(var(--tag-h, 40) 70% 72%);
+  }
+
+  .-invertcolorscheme .tag-chip {
+    background: hsl(var(--tag-h, 40) 60% 48% / 0.14);
+    color: hsl(var(--tag-h, 40) 58% 34%);
+  }
+}
+
+/* Inline time chip — a detected "13:30" / "13:30–14:00" in a todo. */
+.time-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  margin: 0 0.12em;
+  padding: 0.02em 0.5em;
+  border-radius: 6px;
+  font-size: 0.82em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--button-active-bg);
+  color: var(--header-text);
+}
+
+.time-chip::before {
+  content: '◷';
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.time-chip.-cross::after {
+  content: '次日';
+  margin-left: 0.15em;
+  font-size: 0.78em;
+  font-weight: 600;
+  opacity: 0.65;
+}
+
+/* Shared button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  padding: 0.4em 0.7em;
+  border: none;
+  border-radius: 6px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.btn:hover {
+  background: var(--button-active-bg);
+  color: var(--button-active-text);
+}
+
+.btn:active {
+  background: var(--button-active-bg);
+  color: var(--button-active-text);
+}
+
+.btn:disabled {
+  color: var(--disabled-text);
+  cursor: default;
+  background: var(--button-bg);
+}
+
+.btn.-highlight {
+  color: var(--button-highlight-text);
+}

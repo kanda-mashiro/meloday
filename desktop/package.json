@@ -1,0 +1,27 @@
+{
+  "name": "mytodo-capture",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MyTodo desktop quick-capture — global hotkey → Inbox",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "@tauri-apps/api": "^2",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5",
+    "vue-tsc": "^2.2.0"
+  }
+}

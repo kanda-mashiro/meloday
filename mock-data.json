@@ -1,0 +1,41 @@
+{
+  "at": "2026-06-04",
+  "customAt": 0,
+  "customLists": [
+    { "id": "cl-week", "index": 0, "title": "This Week" },
+    { "id": "cl-month", "index": 1, "title": "This Month" },
+    { "id": "cl-someday", "index": 2, "title": "Someday" }
+  ],
+  "items": [
+    { "id": "i-in1", "listId": "inbox", "index": 0, "label": "随手记:试试新的快捷捕获", "done": false, "fixed": false },
+    { "id": "i-in2", "listId": "inbox", "index": 1, "label": "#for me | 看看那篇 Agentic 文章", "done": false, "fixed": false },
+    { "id": "i-in3", "listId": "inbox", "index": 2, "label": "#cariad | 跟进 JIRA 权限申请", "done": false, "fixed": false },
+
+    { "id": "i-p1", "listId": "2026-06-03", "index": 0, "label": "#cariad | 上线回归测试", "done": true, "fixed": false },
+
+    { "id": "i-01", "listId": "2026-06-04", "index": 0, "label": "#for me #recur | 检查邮箱与日程", "done": false, "fixed": false },
+    { "id": "i-02", "listId": "2026-06-04", "index": 1, "label": "#cariad | OKR 填写", "done": false, "fixed": false },
+    { "id": "i-03", "listId": "2026-06-04", "index": 2, "label": "#cariad | CEA2.0 CCU 评估", "done": false, "fixed": false },
+    { "id": "i-04", "listId": "2026-06-04", "index": 3, "label": "#cariad | 简历筛选", "done": true, "fixed": false },
+    { "id": "i-05", "listId": "2026-06-04", "index": 4, "label": "买牛奶和咖啡豆", "done": false, "fixed": false },
+
+    { "id": "i-11", "listId": "2026-06-05", "index": 0, "label": "#cariad | 与 MTK 宝文对齐接口", "done": false, "fixed": false },
+    { "id": "i-12", "listId": "2026-06-05", "index": 1, "label": "#for me | 健身 30 分钟", "done": false, "fixed": false },
+
+    { "id": "i-21", "listId": "2026-06-06", "index": 0, "label": "#for me | 整理台式机桌面", "done": false, "fixed": false },
+
+    { "id": "i-31", "listId": "2026-06-08", "index": 0, "label": "#cariad | NGX Pro 环境验证", "done": false, "fixed": false },
+
+    { "id": "i-41", "listId": "2026-06-09", "index": 0, "label": "#cariad | 能力线任务拆解", "done": false, "fixed": false },
+    { "id": "i-42", "listId": "2026-06-09", "index": 1, "label": "#cariad #recur | 周会准备", "done": false, "fixed": false },
+
+    { "id": "i-c3", "listId": "cl-week", "index": 0, "label": "#cariad | 能力线 5 月 Plan", "done": false, "fixed": false },
+    { "id": "i-c4", "listId": "cl-week", "index": 1, "label": "#for me | Agentic Design 调研", "done": false, "fixed": false },
+
+    { "id": "i-c5", "listId": "cl-month", "index": 0, "label": "#for me | 整理手机相册", "done": false, "fixed": false },
+    { "id": "i-c6", "listId": "cl-month", "index": 1, "label": "#cariad | 各种性能监控梳理", "done": false, "fixed": false },
+
+    { "id": "i-c7", "listId": "cl-someday", "index": 0, "label": "#for me | 研究一下 Vanilla Prime", "done": false, "fixed": false },
+    { "id": "i-c8", "listId": "cl-someday", "index": 1, "label": "#for me | 计划一次旅行", "done": false, "fixed": false }
+  ]
+}

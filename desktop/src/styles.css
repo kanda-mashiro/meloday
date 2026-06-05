@@ -1,0 +1,28 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  /* Transparent so the rounded capture bar floats. */
+  background: transparent;
+}
+
+#app {
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, Helvetica, 'Helvetica Neue',
+    Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The floating capture bar. */
+#app > .cap {
+  height: 100vh;
+  border-radius: 14px;
+  background: rgba(22, 22, 26, 0.96);
+  border: 1px solid #34343c;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
