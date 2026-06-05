@@ -161,16 +161,13 @@ textarea {
   color: inherit;
 }
 
-/* Ruled-paper backdrop — faint horizontal lines on the baseline grid.
-   Applied to list bodies so even empty columns read as lined paper. */
-.ruled {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--line-h) - 1px),
-    var(--rule) calc(var(--line-h) - 1px),
-    var(--rule) var(--line-h)
-  );
+/* Ruled-paper effect: a hairline under each row instead of a fixed-interval
+   backdrop, so the line always sits at the row's baseline and never cuts
+   through a wrapped, multi-line label. Empty space below the last item stays
+   blank (matching TeuxDeux). */
+.ruled .todo-item,
+.ruled .todo-item-input {
+  border-bottom: 1px solid var(--rule);
 }
 
 /* Inline tag chips — hue comes from --tag-h (set per chip).

@@ -80,7 +80,7 @@ function onChange(event: DragChangeEvent) {
       class="todo-list__items"
       group="todo-items"
       item-key="id"
-      handle=".todo-item__handle"
+      handle=".todo-item__label"
       :animation="150"
       ghost-class="todo-list__ghost"
       drag-class="todo-list__drag"

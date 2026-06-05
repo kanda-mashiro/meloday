@@ -135,6 +135,7 @@ function submit(): void {
 .todo-item-input {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.55rem;
   min-height: var(--line-h);
   padding: 0 0.35rem;

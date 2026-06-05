@@ -92,6 +92,7 @@ function remove(): void {
     <span
       v-else
       class="todo-item__label"
+      :title="item.label"
       @click.stop="startEditing"
     ><template v-for="(seg, i) in segments" :key="i"><span
         v-if="seg.kind === 'tag'"
@@ -107,8 +108,6 @@ function remove(): void {
         v-else-if="seg.text.trim()"
         class="todo-item__text"
       >{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
-
-    <span class="todo-item__handle" title="Drag to move" aria-hidden="true">⠿</span>
 
     <button
       class="todo-item__note"
@@ -139,8 +138,10 @@ function remove(): void {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  height: var(--line-h);
-  padding: 0 0.35rem;
+  /* Grow past one baseline row when the label wraps; single-line items still
+     measure exactly --line-h, so they stay snapped to the ruled grid. */
+  min-height: var(--line-h);
+  padding: 0.25rem 0.35rem;
   transition: opacity 0.15s ease;
 }
 
@@ -195,11 +196,23 @@ function remove(): void {
 .todo-item__label {
   flex: 1 1 auto;
   min-width: 0;
-  cursor: text;
-  white-space: nowrap;
+  /* The label doubles as the drag handle (see TodoList's `handle`), so show a
+     grab cursor to hint it's draggable. A click still edits; drag reorders. */
+  cursor: grab;
+  /* Wrap long labels, but cap at 2 lines with an ellipsis so a pasted URL can't
+     balloon the row. Full text shows on hover (title) and when editing. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
   color: var(--main-text);
+}
+
+.todo-item__label:active {
+  cursor: grabbing;
 }
 
 .todo-item.-done .todo-item__label {
@@ -225,24 +238,6 @@ function remove(): void {
   border: none;
   padding: 0;
   outline: none;
-}
-
-.todo-item__handle {
-  flex: 0 0 auto;
-  visibility: hidden;
-  color: var(--disabled-text);
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: grab;
-  user-select: none;
-}
-
-.todo-item__handle:active {
-  cursor: grabbing;
-}
-
-.todo-item:hover .todo-item__handle {
-  visibility: visible;
 }
 
 .todo-item__note {
