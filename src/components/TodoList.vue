@@ -8,7 +8,7 @@ import { getTime } from '../lib/time'
 import TodoItem from './TodoItem.vue'
 import TodoItemInput from './TodoItemInput.vue'
 
-const props = defineProps<{ listId: string; items: TodoItemType[] }>()
+const props = defineProps<{ listId: string; items: TodoItemType[]; focusable?: boolean }>()
 
 const store = useTodoStore()
 const { prefs } = usePreferences()
@@ -87,7 +87,7 @@ function onChange(event: DragChangeEvent) {
       @change="onChange"
     >
       <template #item="{ element }">
-        <TodoItem :item="element" />
+        <TodoItem :item="element" :focusable="focusable" />
       </template>
       <template #footer>
         <TodoItemInput

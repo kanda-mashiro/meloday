@@ -4,14 +4,20 @@ import type { TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useTagFilter } from '../composables/useTagFilter'
 import { useNotes } from '../composables/useNotes'
+import { useFocusSession } from '../composables/useFocusSession'
 import { hasTag, tagHue } from '../lib/tags'
 import { parseLabelRich } from '../lib/time'
 
-const props = defineProps<{ item: TodoItem }>()
+const props = defineProps<{ item: TodoItem; focusable?: boolean }>()
 
 const store = useTodoStore()
 const { activeTag, toggle: toggleTag } = useTagFilter()
 const notes = useNotes()
+const focusSession = useFocusSession()
+
+function startFocus(): void {
+  focusSession.start({ id: props.item.id, label: props.item.label })
+}
 
 const segments = computed(() => parseLabelRich(props.item.label).segments)
 
@@ -108,6 +114,19 @@ function remove(): void {
         v-else-if="seg.text.trim()"
         class="todo-item__text"
       >{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
+
+    <button
+      v-if="focusable"
+      class="todo-item__focus"
+      type="button"
+      title="专注做这件事"
+      aria-label="Focus"
+      @click.stop="startFocus"
+    >
+      <svg viewBox="0 0 16 16" class="todo-item__focus-glyph" aria-hidden="true">
+        <path d="M5 3.5l7 4.5-7 4.5z" />
+      </svg>
+    </button>
 
     <button
       class="todo-item__note"
@@ -279,6 +298,37 @@ function remove(): void {
 .todo-item__note.-has {
   visibility: visible;
   color: var(--accent);
+}
+
+.todo-item__focus {
+  flex: 0 0 auto;
+  visibility: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--disabled-text);
+  cursor: pointer;
+}
+
+.todo-item__focus-glyph {
+  width: 0.8rem;
+  height: 0.8rem;
+  fill: currentColor;
+}
+
+.todo-item:hover .todo-item__focus {
+  visibility: visible;
+}
+
+.todo-item__focus:hover {
+  color: var(--highlight-text);
+  background: var(--button-active-bg);
 }
 
 .todo-item__delete {

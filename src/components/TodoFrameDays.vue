@@ -4,6 +4,7 @@ import type { DayList } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { usePreferences } from '../composables/usePreferences'
 import TodoDay from './TodoDay.vue'
+import TodoDayFocus from './TodoDayFocus.vue'
 import InboxColumn from './InboxColumn.vue'
 import AppCalendar from './AppCalendar.vue'
 
@@ -17,6 +18,12 @@ const visibleDays = computed<DayList[]>(() => {
   const lead = prefs.startOn === 'yesterday' ? 1 : 0
   const from = Math.max(0, (at < 0 ? 0 : at) - lead)
   return days.slice(from, from + prefs.columns)
+})
+
+// The single-day view becomes the focus timeline — the day at the cursor.
+const currentDay = computed<DayList | undefined>(() => {
+  const days = store.days.value
+  return days.find((d) => d.id === store.state.at) ?? days[0]
 })
 </script>
 
@@ -33,7 +40,11 @@ const visibleDays = computed<DayList[]>(() => {
       <button class="btn" type="button" title="Next week" @click="store.seekDays(7)">»</button>
     </div>
 
-    <div class="frame-days__grid">
+    <TodoDayFocus
+      v-if="prefs.columns === 1 && currentDay"
+      :day="currentDay"
+    />
+    <div v-else class="frame-days__grid">
       <InboxColumn />
       <TodoDay
         v-for="day in visibleDays"

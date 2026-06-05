@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { onMounted, onBeforeUnmount, ref, watch, computed } from 'vue';
 import AppHeader from './components/AppHeader.vue';
 import TodoFrameDays from './components/TodoFrameDays.vue';
 import TodoFrameCustom from './components/TodoFrameCustom.vue';
 import PreferencesPanel from './components/PreferencesPanel.vue';
 import ArchiveView from './components/ArchiveView.vue';
 import NotePanel from './components/NotePanel.vue';
+import FocusSession from './components/FocusSession.vue';
 import AppBottomBar from './components/AppBottomBar.vue';
 import QuickCapture from './components/QuickCapture.vue';
 import AuthGate from './components/AuthGate.vue';
@@ -14,6 +15,7 @@ import { useTagFilter } from './composables/useTagFilter';
 import { useQuickCapture } from './composables/useQuickCapture';
 import { useAuth } from './composables/useAuth';
 import { useSync } from './composables/useSync';
+import { usePreferences } from './composables/usePreferences';
 import { tagHue } from './lib/tags';
 
 const { activeTag, clear: clearTag } = useTagFilter();
@@ -21,6 +23,11 @@ const { openCapture } = useQuickCapture();
 const { user, ready, hasPassword, forceSetPassword } = useAuth();
 // Initialize the sync engine (watches auth, owns the per-user cache + cloud).
 useSync();
+const { prefs } = usePreferences();
+// The single-day view is a distraction-free focus mode: hide the global header
+// and the Lists section so only the day's card shows. The bottom bar stays
+// (its column switcher is how you leave focus mode).
+const focusMode = computed(() => prefs.columns === 1);
 const customOpen = ref(true);
 const prefsOpen = ref(false);
 const archiveOpen = ref(false);
@@ -68,13 +75,15 @@ onBeforeUnmount(() => {
   <div v-else class="app">
     <div class="app__accent" />
 
-    <AppHeader @preferences="prefsOpen = true" @history="archiveOpen = true" />
+    <AppHeader v-if="!focusMode" @preferences="prefsOpen = true" @history="archiveOpen = true" />
 
     <PreferencesPanel :open="prefsOpen" @close="prefsOpen = false" />
 
     <ArchiveView :open="archiveOpen" @close="archiveOpen = false" />
 
     <NotePanel />
+
+    <FocusSession />
 
     <div v-if="activeTag" class="app__filter">
       <span class="app__filter-text">Focusing</span>
@@ -85,7 +94,7 @@ onBeforeUnmount(() => {
     <main class="app__main">
       <TodoFrameDays />
 
-      <section class="app__custom">
+      <section v-if="!focusMode" class="app__custom">
         <button
           class="app__custom-tab"
           type="button"
