@@ -3,16 +3,18 @@ import { ref, watch, computed, nextTick } from 'vue'
 import { useNotes } from '../composables/useNotes'
 import { parseLabelRich, type RichSegment } from '../lib/time'
 import { tagHue } from '../lib/tags'
+import NoteEditor from './NoteEditor.vue'
 
 const { activeItem, close, loadNote, saveNote } = useNotes()
 
-const content = ref('')
 const status = ref<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle')
 const errorMsg = ref<string | null>(null)
-const textareaEl = ref<HTMLTextAreaElement | null>(null)
+// The child rich editor; we reach into its exposed `editor` ref to load,
+// serialize and focus the TipTap instance.
+const editorRef = ref<InstanceType<typeof NoteEditor> | null>(null)
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined
-// The item id the textarea content currently belongs to (guards async races).
+// The item id the editor content currently belongs to (guards async races).
 let loadedFor: string | null = null
 
 const titleSegments = computed<RichSegment[]>(() =>
@@ -34,6 +36,22 @@ const statusText = computed(() => {
   }
 })
 
+// Current editor HTML, with empty mapped to '' so saveNote deletes the row
+// (and clears the board icon). An empty TipTap doc serializes to "<p></p>",
+// which is non-empty text — `editor.isEmpty` is the reliable empty check.
+function currentValue(): string {
+  const editor = editorRef.value?.editor
+  if (!editor) return ''
+  return editor.isEmpty ? '' : editor.getHTML()
+}
+
+// Push loaded HTML into the editor without firing onUpdate (so loading a note
+// doesn't trigger an autosave). v3's setContent takes an options object.
+function applyContent(html: string): void {
+  const editor = editorRef.value?.editor
+  editor?.commands.setContent(html || '', { emitUpdate: false })
+}
+
 // Load the note whenever the panel targets a (different) item.
 watch(activeItem, async (item) => {
   if (saveTimer) {
@@ -49,12 +67,15 @@ watch(activeItem, async (item) => {
   const { content: loaded, error } = await loadNote(item.id)
   // The user may have switched items while we were loading — bail if so.
   if (activeItem.value?.id !== item.id) return
-  content.value = loaded
+  // The editor is mounted for the panel's lifetime, but if it isn't ready yet
+  // (very first open) wait a tick so setContent/focus land on a live instance.
+  if (!editorRef.value?.editor) await nextTick()
+  applyContent(loaded)
   loadedFor = item.id
   status.value = error ? 'error' : 'idle'
   errorMsg.value = error
   await nextTick()
-  textareaEl.value?.focus()
+  editorRef.value?.editor?.commands.focus('end')
 })
 
 async function persist(id: string, value: string): Promise<void> {
@@ -69,13 +90,13 @@ async function persist(id: string, value: string): Promise<void> {
   }
 }
 
-function onInput(): void {
+function onUpdate(): void {
   const item = activeItem.value
   if (!item) return
   status.value = 'saving'
   if (saveTimer) clearTimeout(saveTimer)
   const id = item.id
-  const value = content.value
+  const value = currentValue()
   saveTimer = setTimeout(() => void persist(id, value), 600)
 }
 
@@ -84,7 +105,7 @@ function onClose(): void {
   if (saveTimer && activeItem.value) {
     clearTimeout(saveTimer)
     saveTimer = undefined
-    void saveNote(activeItem.value.id, content.value)
+    void saveNote(activeItem.value.id, currentValue())
   }
   close()
 }
@@ -113,14 +134,7 @@ function onClose(): void {
         <button class="note__close" type="button" aria-label="Close" @click="onClose">×</button>
       </header>
 
-      <textarea
-        ref="textareaEl"
-        v-model="content"
-        class="note__textarea"
-        placeholder="写点笔记… 换行会保留。"
-        spellcheck="false"
-        @input="onInput"
-      />
+      <NoteEditor ref="editorRef" class="note__editor" @update="onUpdate" />
 
       <footer class="note__foot">
         <span class="note__status" :class="{ '-error': status === 'error' }">{{ statusText }}</span>
@@ -205,22 +219,9 @@ function onClose(): void {
   color: var(--main-text);
 }
 
-.note__textarea {
+.note__editor {
   flex: 1 1 auto;
-  width: 100%;
-  resize: none;
-  border: none;
-  outline: none;
-  padding: 1.1rem 1.25rem;
-  background: transparent;
-  color: var(--main-text);
-  font: inherit;
-  font-size: 0.95rem;
-  line-height: 1.6;
-}
-
-.note__textarea::placeholder {
-  color: var(--disabled-text);
+  min-height: 0;
 }
 
 .note__foot {
