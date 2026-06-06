@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { DayList } from '../types/todo'
 import { usePreferences } from '../composables/usePreferences'
+import { useSelection } from '../composables/useSelection'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth, formatDateId } from '../lib/date'
 import TodoList from './TodoList.vue'
 import TaskNotePanel from './TaskNotePanel.vue'
@@ -9,9 +10,14 @@ import DayTimer from './DayTimer.vue'
 
 const props = defineProps<{ day: DayList }>()
 const { prefs } = usePreferences()
+const selection = useSelection()
 
 // The workspace's right pane (note + timer) is open by default.
 const paneOpen = ref(true)
+
+// The focus timer + note are about a specific task, so they only show once one
+// is selected.
+const hasSelection = computed(() => !!selection.selectedId.value)
 
 const subline = computed(
   () => `${formatMonth(props.day.date)} ${formatDayOfMonth(props.day.date)}`,
@@ -38,15 +44,6 @@ const done = computed(() => props.day.items.filter((i) => i.done).length)
 const progress = computed(() =>
   total.value === 0 ? 0 : Math.round((done.value / total.value) * 100),
 )
-
-// Subtle time-of-day greeting, today only.
-const greeting = computed(() => {
-  if (!props.day.isToday) return ''
-  const h = new Date().getHours()
-  if (h < 12) return '早安'
-  if (h < 18) return '下午好'
-  return '晚上好'
-})
 </script>
 
 <template>
@@ -60,7 +57,6 @@ const greeting = computed(() => {
             <span v-if="relativeDay" class="focus__chip">{{ relativeDay }}</span>
           </div>
           <h2 class="focus__weekday">{{ weekday }}</h2>
-          <span v-if="greeting" class="focus__greeting">{{ greeting }}</span>
 
           <div v-if="total > 0" class="focus__progress">
             <span class="focus__count">{{ total }} 项 · 已完成 {{ done }}</span>
@@ -105,7 +101,7 @@ const greeting = computed(() => {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
         </div>
-        <DayTimer />
+        <DayTimer v-show="hasSelection" />
         <TaskNotePanel />
       </aside>
     </div>
@@ -145,6 +141,11 @@ const greeting = computed(() => {
 .focus__card {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* Fill the viewport like the side pane when the list is short (so the two
+     panes line up); grow taller and scroll when the list is long. */
+  min-height: calc(100vh - 9rem);
   padding: 1.6rem 1.75rem 2.5rem;
   background: var(--main-bg);
   border: 1px solid var(--divider);
@@ -253,13 +254,6 @@ const greeting = computed(() => {
   background: color-mix(in srgb, var(--accent, var(--highlight-text)) 14%, transparent);
 }
 
-.focus__greeting {
-  margin-top: 0.1rem;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--aside-text);
-}
-
 .focus__progress {
   margin-top: 0.75rem;
   display: flex;
@@ -292,9 +286,10 @@ const greeting = computed(() => {
   margin-top: 0.25rem;
   display: flex;
   flex-direction: column;
-  /* A tall click target: tapping the empty space below the items adds a todo
-     (the card is otherwise only as tall as its content). */
-  min-height: 55vh;
+  /* Fill the card so the empty space below the items stays a click-to-add
+     target. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Keep a clickable empty tail below the items even when a long list fills past
@@ -308,6 +303,10 @@ const greeting = computed(() => {
   .focus__workspace.-pane-open {
     flex-direction: column;
     max-width: 640px;
+  }
+
+  .focus__card {
+    min-height: auto;
   }
 
   .focus__pane {
