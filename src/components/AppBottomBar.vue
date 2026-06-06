@@ -32,6 +32,7 @@ const { openCapture } = useQuickCapture()
           class="bottom-bar__seg-btn"
           :class="{ '-active': prefs.columns === n }"
           type="button"
+          :title="`${n} 天 · 快捷键 ${n}`"
           @click="prefs.columns = n"
         >
           {{ n }}

@@ -44,6 +44,14 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
     openCapture();
+    return;
+  }
+  // 1 / 3 / 5 / 7 switch the day-column count — but not while typing in a field
+  // and not when a modifier is held (so ⌘1 etc. stay with the browser).
+  if (!e.metaKey && !e.ctrlKey && !e.altKey && ['1', '3', '5', '7'].includes(e.key)) {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    prefs.columns = Number(e.key);
   }
 }
 
