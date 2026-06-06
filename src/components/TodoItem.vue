@@ -473,14 +473,14 @@ function closeMenu(): void {
 }
 
 .todo-item.-prio-p0::before {
-  background: #e0524e;
+  background: var(--prio-p0);
 }
 
 .todo-item.-prio-p1::before {
-  background: #e07b39;
+  background: var(--prio-p1);
 }
 
 .todo-item.-prio-p2::before {
-  background: #6b7a90;
+  background: var(--prio-p2);
 }
 </style>

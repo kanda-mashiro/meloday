@@ -11,6 +11,11 @@
   --amber: #d2912a;
   --amber-strong: #b8771a;
 
+  /* Priority colors (#p0/#p1/#p2) — fixed regardless of theme */
+  --prio-p0: #e0524e;
+  --prio-p1: #e07b39;
+  --prio-p2: #6b7a90;
+
   /* Baseline grid height — every todo row + ruled line snaps to this */
   --line-h: 2.5rem;
 
@@ -232,15 +237,15 @@ textarea {
 }
 
 .prio-badge.-p0 {
-  background: #e0524e;
+  background: var(--prio-p0);
 }
 
 .prio-badge.-p1 {
-  background: #e07b39;
+  background: var(--prio-p1);
 }
 
 .prio-badge.-p2 {
-  background: #6b7a90;
+  background: var(--prio-p2);
 }
 
 .prio-badge.-on {

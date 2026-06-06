@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useTodoStore } from '../composables/useTodoStore'
-import { buildLabel, tagHue, priorityLevel } from '../lib/tags'
+import { buildLabel, tagHue, priorityLevel, topPriority } from '../lib/tags'
 
 const props = defineProps<{ listId: string }>()
 const emit = defineEmits<{ blurEmpty: []; captured: [] }>()
@@ -14,6 +14,9 @@ const tags = ref<string[]>([])
 const text = ref('')
 const mode = ref<Mode>('body')
 const inputEl = ref<HTMLInputElement | null>(null)
+
+// Highest priority among the entered tags — drives the row's left accent strip.
+const priority = computed(() => topPriority(tags.value))
 
 // A leading '#' or fullwidth '＃' (what a Chinese IME produces) starts a tag.
 // The keydown handler catches the keypress, but IME-inserted punctuation can
@@ -115,7 +118,11 @@ function submit(): void {
 </script>
 
 <template>
-  <div class="todo-item-input" :class="{ '-tagging': mode === 'tag' }" @click="focus">
+  <div
+    class="todo-item-input"
+    :class="[{ '-tagging': mode === 'tag' }, priority ? `-prio-${priority}` : '']"
+    @click="focus"
+  >
     <!-- Sits in the checkbox slot so chips/text line up with saved items. -->
     <span class="todo-item-input__bullet">+</span>
 
@@ -151,6 +158,7 @@ function submit(): void {
 
 <style scoped>
 .todo-item-input {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -158,6 +166,31 @@ function submit(): void {
   min-height: var(--line-h);
   padding: 0 0.35rem;
   cursor: text;
+}
+
+/* Left accent strip mirrors the saved priority rows. */
+.todo-item-input.-prio-p0::before,
+.todo-item-input.-prio-p1::before,
+.todo-item-input.-prio-p2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.todo-item-input.-prio-p0::before {
+  background: var(--prio-p0);
+}
+
+.todo-item-input.-prio-p1::before {
+  background: var(--prio-p1);
+}
+
+.todo-item-input.-prio-p2::before {
+  background: var(--prio-p2);
 }
 
 .todo-item-input__bullet {
