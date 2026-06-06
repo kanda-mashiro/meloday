@@ -160,7 +160,7 @@ const greeting = computed(() => {
 }
 
 .focus__workspace.-pane-open {
-  max-width: 1100px;
+  max-width: 1200px;
 }
 
 .focus__card {
@@ -176,8 +176,8 @@ const greeting = computed(() => {
 
 /* Right pane — the day workspace panel. */
 .focus__pane {
-  flex: 0 0 380px;
-  width: 380px;
+  flex: 0 0 440px;
+  width: 440px;
   align-self: stretch;
   display: flex;
   flex-direction: column;

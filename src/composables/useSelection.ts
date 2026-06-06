@@ -9,10 +9,14 @@ let initialized = false
 function init(): void {
   if (initialized || typeof document === 'undefined') return
   initialized = true
-  // A click that doesn't land on a todo row clears the selection. (Selecting a
-  // row uses @click.stop, so that click never reaches here.)
+  // A click outside a todo row clears the selection — except clicks inside the
+  // focus view's side pane, whose note follows the selection (so editing the
+  // note must not deselect). Selecting a row uses @click.stop, so it never
+  // reaches here.
   document.addEventListener('click', (e) => {
-    if (!(e.target as HTMLElement).closest('.todo-item')) selectedId.value = null
+    if (!(e.target as HTMLElement).closest('.todo-item, .focus__pane')) {
+      selectedId.value = null
+    }
   })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') selectedId.value = null
