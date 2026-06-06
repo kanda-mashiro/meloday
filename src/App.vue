@@ -10,11 +10,9 @@ import FocusSession from './components/FocusSession.vue';
 import Toast from './components/Toast.vue';
 import ShortcutsHelp from './components/ShortcutsHelp.vue';
 import AppBottomBar from './components/AppBottomBar.vue';
-import QuickCapture from './components/QuickCapture.vue';
 import AuthGate from './components/AuthGate.vue';
 import SetPasswordGate from './components/SetPasswordGate.vue';
 import { useTagFilter } from './composables/useTagFilter';
-import { useQuickCapture } from './composables/useQuickCapture';
 import { useAuth } from './composables/useAuth';
 import { useSync } from './composables/useSync';
 import { usePreferences } from './composables/usePreferences';
@@ -26,7 +24,6 @@ import { tagHue } from './lib/tags';
 import type { TodoItem } from './types/todo';
 
 const { activeTag, clear: clearTag } = useTagFilter();
-const { openCapture } = useQuickCapture();
 const { user, ready, hasPassword, forceSetPassword } = useAuth();
 // Initialize the sync engine (watches auth, owns the per-user cache + cloud).
 useSync();
@@ -234,13 +231,8 @@ function toggleSelectedDone(): boolean {
   return true;
 }
 
-// Global in-app shortcut: Cmd/Ctrl+K opens quick-capture to the Inbox.
+// Global in-app keyboard shortcuts.
 function onGlobalKeydown(e: KeyboardEvent): void {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-    e.preventDefault();
-    openCapture();
-    return;
-  }
   // ⌘/Ctrl+Z undoes the last delete (when not typing — leave text undo alone).
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
     const el = e.target as HTMLElement;
@@ -411,7 +403,6 @@ onBeforeUnmount(() => {
     </main>
 
     <AppBottomBar />
-    <QuickCapture />
   </div>
 </template>
 
