@@ -4,7 +4,6 @@ import draggable from 'vuedraggable'
 import type { TodoItem as TodoItemType } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { usePreferences } from '../composables/usePreferences'
-import { getTime } from '../lib/time'
 import TodoItem from './TodoItem.vue'
 import TodoItemInput from './TodoItemInput.vue'
 
@@ -30,17 +29,13 @@ function onEmptyClick(e: MouseEvent): void {
   startAdding()
 }
 
-// Items to render: completed sink to the bottom, timed items rise to the top
-// (by start time); the rest keep their manual (drag) order. Completed can also
-// be hidden entirely via Preferences.
+// Items to render: completed sink to the bottom; everything else keeps its manual
+// (drag / keyboard) order — no time-based auto-sort. Completed can also be hidden
+// entirely via Preferences.
 const source = computed<TodoItemType[]>(() => {
   const items = prefs.showCompleted ? props.items : props.items.filter((i) => !i.done)
   return [...items].sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1
-    const ta = getTime(a.label)
-    const tb = getTime(b.label)
-    if (!!ta !== !!tb) return ta ? -1 : 1
-    if (ta && tb && ta.start !== tb.start) return ta.start - tb.start
     return a.index - b.index
   })
 })
