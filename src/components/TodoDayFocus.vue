@@ -44,7 +44,7 @@ const weekday = computed(() => formatDayOfWeek(props.day.date))
       </header>
 
       <div class="focus__list" :class="{ ruled: prefs.showLines }">
-        <TodoList :list-id="day.id" :items="day.items" :focusable="true" :persistent-add="true" />
+        <TodoList :list-id="day.id" :items="day.items" :focusable="true" />
       </div>
     </article>
   </div>
@@ -113,5 +113,11 @@ const weekday = computed(() => formatDayOfWeek(props.day.date))
   /* A tall click target: tapping the empty space below the items adds a todo
      (the card is otherwise only as tall as its content). */
   min-height: 55vh;
+}
+
+/* Keep a clickable empty tail below the items even when a long list fills past
+   the 55vh floor — clicking it still starts a new todo (no extra input row). */
+.focus__list :deep(.todo-list) {
+  padding-bottom: 5rem;
 }
 </style>
