@@ -6,7 +6,7 @@ import { useFocusSession } from '../composables/useFocusSession'
 import { useNotes } from '../composables/useNotes'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth, formatDateId } from '../lib/date'
 import TodoList from './TodoList.vue'
-import DayNotePanel from './DayNotePanel.vue'
+import TaskNotePanel from './TaskNotePanel.vue'
 import DayTimer from './DayTimer.vue'
 
 const props = defineProps<{ day: DayList }>()
@@ -127,7 +127,7 @@ const greeting = computed(() => {
           </button>
         </div>
         <DayTimer />
-        <DayNotePanel :day-id="day.id" />
+        <TaskNotePanel />
       </aside>
     </div>
   </div>
