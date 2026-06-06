@@ -219,6 +219,7 @@ textarea {
   padding: 0.02em 0.5em;
   border-radius: 6px;
   font-size: 0.82em;
+  line-height: 1.5;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
