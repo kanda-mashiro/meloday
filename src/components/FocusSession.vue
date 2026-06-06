@@ -74,6 +74,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
          leaving is via Esc or the explicit 退出 button, not a stray blank click. -->
     <div class="fs__scrim" />
 
+    <!-- Overlay-level utilities pinned to the corners, out of the center's way. -->
+    <button class="fs__corner -exit" type="button" @click="exit">
+      <kbd class="fs__kbd">Esc</kbd>
+      退出
+    </button>
+    <button class="fs__corner -note" type="button" @click="openNote">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.02em;height:1.02em;display:block"><rect x="3.5" y="2.5" width="9" height="11" rx="1.5"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/></svg>
+      笔记
+    </button>
+
     <div class="fs__panel">
       <p class="fs__eyebrow">{{ phaseLabel }}</p>
 
@@ -170,12 +180,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               @input="onVolume"
             />
           </template>
-        </div>
-
-        <div class="fs__foot">
-          <button class="fs__link" type="button" @click="openNote">笔记</button>
-          <span class="fs__foot-sep" aria-hidden="true">·</span>
-          <button class="fs__link" type="button" @click="exit">退出 · Esc</button>
         </div>
       </div>
     </div>
@@ -416,29 +420,49 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   cursor: pointer;
 }
 
-.fs__foot {
+/* Corner utilities — exit (top-left, with an Esc hint) and note (top-right),
+   kept subtle so they stay clear of the centered task + clock. */
+.fs__corner {
+  position: absolute;
+  top: 1.25rem;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-}
-
-.fs__foot-sep {
-  color: var(--aside-text);
-  opacity: 0.5;
-  font-size: 0.8rem;
-}
-
-.fs__link {
+  gap: 0.45em;
+  padding: 0.35rem 0.6rem;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--aside-text);
   font: inherit;
   font-size: 0.8rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: color 0.12s ease;
+  transition: color 0.12s ease, background-color 0.12s ease;
 }
 
-.fs__link:hover {
+.fs__corner:hover {
   color: var(--highlight-text);
+  background: var(--button-active-bg);
+}
+
+.fs__corner.-exit {
+  left: 1.25rem;
+}
+
+.fs__corner.-note {
+  right: 1.25rem;
+}
+
+.fs__kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.04rem 0.38rem;
+  border: 1px solid var(--main-border-light);
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--aside-text);
 }
 </style>
