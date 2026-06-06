@@ -14,6 +14,11 @@ const emit = defineEmits<{
   (e: 'update'): void
 }>()
 
+// The fixed formatting toolbar is optional — hide it where it's just clutter.
+// Markdown input rules (**bold**, # heading, - list, > quote, ```) and the
+// selection bubble-menu still cover formatting without it.
+withDefaults(defineProps<{ toolbar?: boolean }>(), { toolbar: true })
+
 // Bumped on every editor transaction so the toolbar's active-state buttons
 // re-render (TipTap mutates the editor in place, which Vue can't track).
 const tick = ref(0)
@@ -127,7 +132,7 @@ const TOOLBAR_GROUPS: { items: { key: string; label: string; svg?: string; title
 
 <template>
   <div class="ne">
-    <div v-if="editor" class="ne__toolbar" role="toolbar" aria-label="Formatting">
+    <div v-if="editor && toolbar" class="ne__toolbar" role="toolbar" aria-label="Formatting">
       <template v-for="(group, gi) in TOOLBAR_GROUPS" :key="gi">
         <span v-if="gi > 0" class="ne__sep" aria-hidden="true" />
         <button

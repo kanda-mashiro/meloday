@@ -114,7 +114,7 @@ onBeforeUnmount(flushPending)
     </header>
 
     <div v-if="!selectedItem" class="tnote__empty">选中一条任务来记笔记</div>
-    <NoteEditor v-show="selectedItem" ref="editorRef" class="tnote__editor" @update="onUpdate" />
+    <NoteEditor v-show="selectedItem" ref="editorRef" :toolbar="false" class="tnote__editor" @update="onUpdate" />
   </section>
 </template>
 
