@@ -1,25 +1,50 @@
 import { ref, type Ref } from 'vue'
 
-// Ambient focus noise, synthesized in the browser with the Web Audio API — no
-// audio files to host, works offline, nothing to license. Three "colors":
-//   white — flat/hissy
-//   pink  — balanced (Paul Kellet's filter)
-//   brown — deep rumble (the calm default)
-export type NoiseType = 'white' | 'pink' | 'brown'
+// Ambient focus sound, picked by SCENE rather than noise "color" (ordinary users
+// think "rain"/"ocean", not "pink/brown"). Most scenes are backed by a small
+// looping audio file under public/sounds/<id>.mp3; the "white" scene is the
+// original Web-Audio-synthesized white noise (no file — works offline, nothing
+// to host). Decoded buffers are cached and made seamlessly loopable with the
+// same 50ms equal-overlap crossfade the synth uses.
+
+export type SceneId = 'rain' | 'ocean' | 'cafe' | 'forest' | 'fire' | 'white'
+
+export interface Scene {
+  id: SceneId
+  label: string
+  /** Source file under /sounds; absent for the synthesized scene. */
+  file?: string
+}
+
+// Order = display order. "white" last: it's the synth fallback, always available.
+export const SCENES: readonly Scene[] = [
+  { id: 'rain', label: '雨声', file: '/sounds/rain.mp3' },
+  { id: 'ocean', label: '海浪', file: '/sounds/ocean.mp3' },
+  { id: 'cafe', label: '咖啡馆', file: '/sounds/cafe.mp3' },
+  { id: 'forest', label: '森林', file: '/sounds/forest.mp3' },
+  { id: 'fire', label: '篝火', file: '/sounds/fire.mp3' },
+  { id: 'white', label: '白噪音' },
+] as const
+
+const SCENE_IDS = SCENES.map((s) => s.id) as SceneId[]
+function isSceneId(v: unknown): v is SceneId {
+  return typeof v === 'string' && (SCENE_IDS as string[]).includes(v)
+}
 
 const STORAGE_KEY = 'my-todo-ambient'
+const DEFAULT_SCENE: SceneId = 'rain'
 
 const playing = ref(false)
-const type = ref<NoiseType>('brown')
+const scene = ref<SceneId>(DEFAULT_SCENE)
 const volume = ref(0.5)
 
-// Restore the last color + volume (not the on/off state — sound never
+// Restore the last scene + volume (not the on/off state — sound never
 // auto-starts without a click).
 try {
   const raw = localStorage.getItem(STORAGE_KEY)
   if (raw) {
-    const p = JSON.parse(raw) as { type?: NoiseType; volume?: number }
-    if (p.type === 'white' || p.type === 'pink' || p.type === 'brown') type.value = p.type
+    const p = JSON.parse(raw) as { scene?: unknown; volume?: unknown }
+    if (isSceneId(p.scene)) scene.value = p.scene
     if (typeof p.volume === 'number') volume.value = Math.min(1, Math.max(0, p.volume))
   }
 } catch {
@@ -28,7 +53,7 @@ try {
 
 function persist(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ type: type.value, volume: volume.value }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ scene: scene.value, volume: volume.value }))
   } catch {
     // ignore
   }
@@ -38,6 +63,15 @@ let ctx: AudioContext | null = null
 let gain: GainNode | null = null
 let source: AudioBufferSourceNode | null = null
 
+// Bumped every time the desired sound changes (toggle off / scene switch). A
+// buffer that finishes decoding for an out-of-date token is discarded instead
+// of being played, so a slow fetch can't resurrect a scene the user left.
+let playToken = 0
+
+// Decoded-and-loopable buffers, keyed by scene id. The synth scene is generated
+// fresh each play (cheap, and keeps the noise from repeating identically).
+const bufferCache = new Map<SceneId, AudioBuffer>()
+
 function ensureContext(): void {
   if (ctx) return
   ctx = new AudioContext()
@@ -46,66 +80,96 @@ function ensureContext(): void {
   gain.connect(ctx.destination)
 }
 
-// A few seconds of looped noise — long enough that the loop isn't audible.
-function makeBuffer(c: AudioContext, kind: NoiseType): AudioBuffer {
-  const len = Math.floor(c.sampleRate * 4)
-  // Generate a little extra so we can crossfade the loop seam (see below).
-  const fade = Math.floor(c.sampleRate * 0.05) // 50ms
-  const total = len + fade
-  const out = new Float32Array(total)
+const FADE_SECONDS = 0.05 // 50ms loop crossfade
 
-  if (kind === 'white') {
-    for (let i = 0; i < total; i++) out[i] = (Math.random() * 2 - 1) * 0.5
-  } else if (kind === 'brown') {
-    let last = 0
-    for (let i = 0; i < total; i++) {
-      const w = Math.random() * 2 - 1
-      last = (last + 0.02 * w) / 1.02
-      out[i] = last * 3.5
-    }
-  } else {
-    let b0 = 0,
-      b1 = 0,
-      b2 = 0,
-      b3 = 0,
-      b4 = 0,
-      b5 = 0,
-      b6 = 0
-    for (let i = 0; i < total; i++) {
-      const w = Math.random() * 2 - 1
-      b0 = 0.99886 * b0 + w * 0.0555179
-      b1 = 0.99332 * b1 + w * 0.0750759
-      b2 = 0.969 * b2 + w * 0.153852
-      b3 = 0.8665 * b3 + w * 0.3104856
-      b4 = 0.55 * b4 + w * 0.5329522
-      b5 = -0.7616 * b5 - w * 0.016898
-      out[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11
-      b6 = w * 0.115926
+// Seamless loop: equal-overlap crossfade so the wrap from the last sample back
+// to the first has no click. The buffer must carry `fade` samples of extra tail
+// (the would-be continuation past the loop point) which we blend into the head;
+// the returned buffer is exactly `len` long. Works for synth noise and decoded
+// files alike. Multi-channel buffers are handled per channel.
+function makeLoopable(c: AudioContext, channels: Float32Array[], len: number, fade: number): AudioBuffer {
+  const buf = c.createBuffer(channels.length, len, c.sampleRate)
+  for (let ch = 0; ch < channels.length; ch++) {
+    const src = channels[ch]
+    const out = buf.getChannelData(ch)
+    out.set(src.subarray(0, len))
+    for (let i = 0; i < fade; i++) {
+      const t = i / fade
+      out[i] = src[len + i] * (1 - t) + src[i] * t
     }
   }
-
-  // Seamless loop: equal-overlap crossfade so the wrap from out[len-1] → out[0]
-  // has no click. White noise is already seamless (memoryless), but pink/brown
-  // carry state, so without this they'd tick once per loop. We blend the head
-  // with the would-be continuation past the loop point.
-  for (let i = 0; i < fade; i++) {
-    const t = i / fade
-    out[i] = out[len + i] * (1 - t) + out[i] * t
-  }
-
-  const buf = c.createBuffer(1, len, c.sampleRate)
-  buf.getChannelData(0).set(out.subarray(0, len))
   return buf
 }
 
-function startSource(): void {
+// A few seconds of looped noise — long enough that the loop isn't audible.
+function makeSynthBuffer(c: AudioContext): AudioBuffer {
+  const len = Math.floor(c.sampleRate * 4)
+  const fade = Math.floor(c.sampleRate * FADE_SECONDS)
+  const total = len + fade
+  const out = new Float32Array(total)
+  for (let i = 0; i < total; i++) out[i] = (Math.random() * 2 - 1) * 0.5
+  return makeLoopable(c, [out], len, fade)
+}
+
+// Turn a decoded file buffer into a seamless loop. We need `fade` samples of
+// tail past the loop point to crossfade into the head, so the loop length is
+// (decoded length − fade); the tail samples are the blend partners. Files
+// shorter than a couple of fade-widths are returned as-is (can't meaningfully
+// crossfade) — still loop, just without the seam smoothing.
+function makeFileLoopable(c: AudioContext, decoded: AudioBuffer): AudioBuffer {
+  const fade = Math.floor(c.sampleRate * FADE_SECONDS)
+  const len = decoded.length - fade
+  if (len <= fade * 2) return decoded
+  const channels: Float32Array[] = []
+  for (let ch = 0; ch < decoded.numberOfChannels; ch++) channels.push(decoded.getChannelData(ch))
+  return makeLoopable(c, channels, len, fade)
+}
+
+// Fetch + decode a scene's file once, cache the loopable result. Returns null on
+// any failure (missing file / 404 / decode error) so callers degrade quietly.
+async function loadSceneBuffer(c: AudioContext, s: Scene): Promise<AudioBuffer | null> {
+  const cached = bufferCache.get(s.id)
+  if (cached) return cached
+  if (!s.file) return null
+  try {
+    const res = await fetch(s.file)
+    if (!res.ok) return null
+    const data = await res.arrayBuffer()
+    const decoded = await c.decodeAudioData(data)
+    const loopable = makeFileLoopable(c, decoded)
+    bufferCache.set(s.id, loopable)
+    return loopable
+  } catch {
+    return null
+  }
+}
+
+function playBuffer(buffer: AudioBuffer): void {
   stopSource()
   const c = ctx as AudioContext
   source = c.createBufferSource()
-  source.buffer = makeBuffer(c, type.value)
+  source.buffer = buffer
   source.loop = true
   source.connect(gain as GainNode)
   source.start()
+}
+
+// (Re)start playback for the current scene. File scenes load asynchronously; the
+// captured token guards against a stale resolution. If a file scene can't load,
+// fall back to the synth white noise so the toggle still does *something* audible.
+function startScene(): void {
+  const c = ctx as AudioContext
+  const token = ++playToken
+  const current = SCENES.find((s) => s.id === scene.value)
+  if (!current || current.id === 'white' || !current.file) {
+    playBuffer(makeSynthBuffer(c))
+    return
+  }
+  void loadSceneBuffer(c, current).then((buf) => {
+    if (token !== playToken || !playing.value) return // user moved on
+    if (buf) playBuffer(buf)
+    else playBuffer(makeSynthBuffer(c)) // graceful fallback
+  })
 }
 
 function stopSource(): void {
@@ -123,11 +187,12 @@ function play(): void {
   ensureContext()
   const c = ctx as AudioContext
   if (c.state === 'suspended') void c.resume()
-  startSource()
   playing.value = true
+  startScene()
 }
 
 function stop(): void {
+  playToken++ // cancel any in-flight load
   stopSource()
   playing.value = false
 }
@@ -137,10 +202,10 @@ function toggle(): void {
   else play()
 }
 
-function setType(t: NoiseType): void {
-  type.value = t
+function setScene(id: SceneId): void {
+  scene.value = id
   persist()
-  if (playing.value) startSource()
+  if (playing.value) startScene()
 }
 
 function setVolume(v: number): void {
@@ -151,13 +216,14 @@ function setVolume(v: number): void {
 
 export function useAmbientSound(): {
   playing: Ref<boolean>
-  type: Ref<NoiseType>
+  scene: Ref<SceneId>
+  scenes: readonly Scene[]
   volume: Ref<number>
   play: () => void
   stop: () => void
   toggle: () => void
-  setType: (t: NoiseType) => void
+  setScene: (id: SceneId) => void
   setVolume: (v: number) => void
 } {
-  return { playing, type, volume, play, stop, toggle, setType, setVolume }
+  return { playing, scene, scenes: SCENES, volume, play, stop, toggle, setScene, setVolume }
 }
