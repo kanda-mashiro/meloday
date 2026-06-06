@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue'
 import type { DayList } from '../types/todo'
 import { usePreferences } from '../composables/usePreferences'
-import { useSelection } from '../composables/useSelection'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth, formatDateId } from '../lib/date'
 import TodoList from './TodoList.vue'
 import TaskNotePanel from './TaskNotePanel.vue'
@@ -10,14 +9,9 @@ import DayTimer from './DayTimer.vue'
 
 const props = defineProps<{ day: DayList }>()
 const { prefs } = usePreferences()
-const selection = useSelection()
 
 // The workspace's right pane (note + timer) is open by default.
 const paneOpen = ref(true)
-
-// The focus timer + note are about a specific task, so they only show once one
-// is selected.
-const hasSelection = computed(() => !!selection.selectedId.value)
 
 const subline = computed(
   () => `${formatMonth(props.day.date)} ${formatDayOfMonth(props.day.date)}`,
@@ -101,7 +95,7 @@ const progress = computed(() =>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
         </div>
-        <DayTimer v-show="hasSelection" />
+        <DayTimer />
         <TaskNotePanel />
       </aside>
     </div>
