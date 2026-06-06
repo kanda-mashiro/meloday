@@ -8,6 +8,7 @@ import ArchiveView from './components/ArchiveView.vue';
 import NotePanel from './components/NotePanel.vue';
 import FocusSession from './components/FocusSession.vue';
 import Toast from './components/Toast.vue';
+import ShortcutsHelp from './components/ShortcutsHelp.vue';
 import AppBottomBar from './components/AppBottomBar.vue';
 import QuickCapture from './components/QuickCapture.vue';
 import AuthGate from './components/AuthGate.vue';
@@ -19,6 +20,7 @@ import { useSync } from './composables/useSync';
 import { usePreferences } from './composables/usePreferences';
 import { useTodoStore } from './composables/useTodoStore';
 import { useSelection } from './composables/useSelection';
+import { useHelp } from './composables/useHelp';
 import { tagHue } from './lib/tags';
 
 const { activeTag, clear: clearTag } = useTagFilter();
@@ -29,6 +31,7 @@ useSync();
 const { prefs } = usePreferences();
 const store = useTodoStore();
 const selection = useSelection();
+const { toggleHelp } = useHelp();
 // The single-day view is a distraction-free focus mode: hide the global header
 // and the Lists section so only the day's card shows. The bottom bar stays
 // (its column switcher is how you leave focus mode).
@@ -113,6 +116,14 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     openCapture();
     return;
   }
+  // ? opens or closes the shortcuts help (Shift+/ on most layouts).
+  if (e.key === '?') {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    e.preventDefault();
+    toggleHelp();
+    return;
+  }
   // Directional keys — arrows or vim hjkl. With a board item selected they move
   // it: up/down reorder within the day, left/right shift it to the prev/next day
   // (the board follows if it scrolls off). With nothing selected, left/right
@@ -181,6 +192,8 @@ onBeforeUnmount(() => {
     <FocusSession />
 
     <Toast />
+
+    <ShortcutsHelp />
 
     <div v-if="activeTag" class="app__filter">
       <span class="app__filter-text">Focusing</span>

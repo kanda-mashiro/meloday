@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { usePreferences } from '../composables/usePreferences'
 import { useDarkMode } from '../composables/useDarkMode'
-import { useTodoStore } from '../composables/useTodoStore'
 import { useQuickCapture } from '../composables/useQuickCapture'
+import { useHelp } from '../composables/useHelp'
 
 const { prefs, columnOptions } = usePreferences()
 const { isDark, toggle } = useDarkMode()
-const store = useTodoStore()
 const { openCapture } = useQuickCapture()
+const { openHelp } = useHelp()
 </script>
 
 <template>
@@ -49,8 +49,14 @@ const { openCapture } = useQuickCapture()
     </div>
 
     <div class="bottom-bar__side bottom-bar__side--right">
-      <button class="bottom-bar__today" type="button" @click="store.seekToToday()">
-        Today
+      <button
+        class="bottom-bar__help"
+        type="button"
+        title="快捷键帮助 · ?"
+        aria-label="快捷键帮助"
+        @click="openHelp()"
+      >
+        ?
       </button>
     </div>
   </footer>
@@ -166,22 +172,24 @@ const { openCapture } = useQuickCapture()
   background: var(--button-active-bg);
 }
 
-.bottom-bar__today {
-  padding: 0.3rem 0.8rem;
+.bottom-bar__help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
   border: 1px solid var(--main-border-light);
-  border-radius: 6px;
+  border-radius: 50%;
   background: transparent;
   color: var(--button-text);
   font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 0.92rem;
+  font-weight: 700;
   cursor: pointer;
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-.bottom-bar__today:hover {
+.bottom-bar__help:hover {
   background: var(--button-active-bg);
   color: var(--button-active-text);
 }
