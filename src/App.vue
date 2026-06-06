@@ -166,6 +166,14 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     toggleHelp();
     return;
   }
+  // t jumps the board back to today.
+  if (e.key.toLowerCase() === 't' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    e.preventDefault();
+    store.seekToToday();
+    return;
+  }
   // Directional keys — arrows or vim hjkl. Plain: move the SELECTION between tasks
   // (or, with nothing selected, navigate the date; Shift = a week). With ⌥ held:
   // move the selected card. Skipped while typing.

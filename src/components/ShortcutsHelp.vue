@@ -19,6 +19,7 @@ const GROUPS: Group[] = [
     rows: [
       { keys: ['←', 'h'], desc: '前一天（⇧ = 一周）' },
       { keys: ['→', 'l'], desc: '后一天（⇧ = 一周）' },
+      { keys: ['t'], desc: '回到今天' },
       { keys: ['[', ']'], desc: '切换天数视图（窄 / 宽）' },
       { keys: ['⌘', 'K'], desc: '快速捕获到 Inbox' },
     ],
