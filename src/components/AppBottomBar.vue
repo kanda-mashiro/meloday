@@ -1,28 +1,16 @@
 <script setup lang="ts">
 import { usePreferences } from '../composables/usePreferences'
 import { useDarkMode } from '../composables/useDarkMode'
-import { useQuickCapture } from '../composables/useQuickCapture'
 import { useHelp } from '../composables/useHelp'
 
 const { prefs, columnOptions } = usePreferences()
 const { isDark, toggle } = useDarkMode()
-const { openCapture } = useQuickCapture()
 const { openHelp } = useHelp()
 </script>
 
 <template>
   <footer class="bottom-bar">
-    <div class="bottom-bar__side">
-      <button
-        class="bottom-bar__capture"
-        type="button"
-        title="Quick capture to Inbox (⌘/Ctrl + K)"
-        @click="openCapture()"
-      >
-        <span class="bottom-bar__capture-plus">✎</span>
-        <span class="bottom-bar__capture-label">Capture</span>
-      </button>
-    </div>
+    <div class="bottom-bar__side" />
 
     <div class="bottom-bar__center">
       <div class="bottom-bar__seg" role="group" aria-label="Columns">
@@ -86,31 +74,6 @@ const { openHelp } = useHelp()
 
 .bottom-bar__side--right {
   justify-content: flex-end;
-}
-
-.bottom-bar__capture {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid var(--main-border-light);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--button-text);
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
-}
-
-.bottom-bar__capture:hover {
-  background: var(--accent-soft);
-  color: var(--highlight-text);
-}
-
-.bottom-bar__capture-plus {
-  font-size: 0.9rem;
 }
 
 .bottom-bar__center {
