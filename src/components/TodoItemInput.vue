@@ -168,9 +168,11 @@ function submit(): void {
 }
 
 .todo-item-input__hash {
-  margin-right: -0.3rem;
+  margin-right: -0.1rem;
   color: var(--accent);
-  font-weight: 700;
+  /* Smaller + not bold so the tag marker doesn't loom over what you type. */
+  font-size: 0.9em;
+  opacity: 0.85;
 }
 
 .todo-item-input__field {

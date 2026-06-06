@@ -122,12 +122,6 @@ const TOOLBAR_GROUPS: { items: { key: string; label: string; svg?: string; title
       { key: 'hr', label: '―', title: '分割线', run: () => editor.value?.chain().focus().setHorizontalRule().run(), isActive: () => false },
     ],
   },
-  {
-    items: [
-      { key: 'undo', label: '↶', title: '撤销 (⌘Z)', run: () => editor.value?.chain().focus().undo().run(), isActive: () => false, disabled: () => { void tick.value; return !editor.value?.can().undo() } },
-      { key: 'redo', label: '↷', title: '重做 (⌘⇧Z)', run: () => editor.value?.chain().focus().redo().run(), isActive: () => false, disabled: () => { void tick.value; return !editor.value?.can().redo() } },
-    ],
-  },
 ]
 </script>
 
