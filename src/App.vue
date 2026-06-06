@@ -247,12 +247,15 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     toggleHelp();
     return;
   }
-  // t jumps the board back to today.
+  // t jumps the board back to today and selects today's first task.
   if (e.key.toLowerCase() === 't' && !e.metaKey && !e.ctrlKey && !e.altKey) {
     const el = e.target as HTMLElement;
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
     e.preventDefault();
     store.seekToToday();
+    const today = store.days.value.find((d) => d.id === store.state.at);
+    const vis = today ? visibleItems(today.items) : [];
+    if (vis.length > 0) selection.select(vis[0].id);
     return;
   }
   // Delete / Backspace removes the selected item (when not typing).
