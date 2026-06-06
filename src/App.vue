@@ -18,6 +18,7 @@ import { useAuth } from './composables/useAuth';
 import { useSync } from './composables/useSync';
 import { usePreferences } from './composables/usePreferences';
 import { useTodoStore } from './composables/useTodoStore';
+import { useSelection } from './composables/useSelection';
 import { tagHue } from './lib/tags';
 
 const { activeTag, clear: clearTag } = useTagFilter();
@@ -27,6 +28,7 @@ const { user, ready, hasPassword, forceSetPassword } = useAuth();
 useSync();
 const { prefs } = usePreferences();
 const store = useTodoStore();
+const selection = useSelection();
 // The single-day view is a distraction-free focus mode: hide the global header
 // and the Lists section so only the day's card shows. The bottom bar stays
 // (its column switcher is how you leave focus mode).
@@ -40,6 +42,59 @@ const passwordSkipped = ref(false);
 watch(user, (u) => {
   if (!u) passwordSkipped.value = false;
 });
+
+// Arrow keys and vim hjkl both map to a direction: h/← left, l/→ right, j/↓ down,
+// k/↑ up.
+const DIR_KEYS: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+  arrowup: 'up',
+  k: 'up',
+  arrowdown: 'down',
+  j: 'down',
+  arrowleft: 'left',
+  h: 'left',
+  arrowright: 'right',
+  l: 'right',
+};
+
+// Move the selected board item one step in a direction. Returns false if there is
+// no selection or it isn't a day item (so the caller falls back to date nav).
+function moveSelectedItem(dir: 'up' | 'down' | 'left' | 'right'): boolean {
+  const id = selection.selectedId.value;
+  if (!id) return false;
+  const days = store.days.value;
+  let di = -1;
+  let ii = -1;
+  for (let d = 0; d < days.length; d++) {
+    const idx = days[d].items.findIndex((it) => it.id === id);
+    if (idx !== -1) {
+      di = d;
+      ii = idx;
+      break;
+    }
+  }
+  if (di === -1) return false;
+  const day = days[di];
+  if (dir === 'up') {
+    if (ii > 0) store.moveItem({ id, listId: day.id, index: ii - 1 });
+    return true;
+  }
+  if (dir === 'down') {
+    if (ii < day.items.length - 1) store.moveItem({ id, listId: day.id, index: ii + 1 });
+    return true;
+  }
+  const dd = dir === 'left' ? di - 1 : di + 1;
+  if (dd < 0 || dd >= days.length) return true;
+  const dest = days[dd];
+  store.moveItem({ id, listId: dest.id, index: dest.items.length });
+  // Follow the item if its new day fell outside the visible window.
+  const at = days.findIndex((d) => d.id === store.state.at);
+  const lead = prefs.startOn === 'yesterday' ? 1 : 0;
+  const from = Math.max(0, (at < 0 ? 0 : at) - lead);
+  if (dd < from || dd >= from + prefs.columns) {
+    store.seekDays(dir === 'left' ? -1 : 1);
+  }
+  return true;
+}
 
 // Global in-app shortcut: Cmd/Ctrl+K opens quick-capture to the Inbox.
 function onGlobalKeydown(e: KeyboardEvent): void {
@@ -58,15 +113,23 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     openCapture();
     return;
   }
-  // ← / → move the visible date by a day (Shift = a week), mirroring the ‹ › « »
-  // nav. Skipped while typing in a field, where arrows move the caret.
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+  // Directional keys — arrows or vim hjkl. With a board item selected they move
+  // it: up/down reorder within the day, left/right shift it to the prev/next day
+  // (the board follows if it scrolls off). With nothing selected, left/right
+  // navigate the date (Shift = a week), like ‹ › « ». Skipped while typing.
+  const dir = DIR_KEYS[e.key.toLowerCase()];
+  if (dir) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const el = e.target as HTMLElement;
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
-    e.preventDefault();
-    const step = e.shiftKey ? 7 : 1;
-    store.seekDays(e.key === 'ArrowLeft' ? -step : step);
+    if (selection.selectedId.value && moveSelectedItem(dir)) {
+      e.preventDefault();
+      return;
+    }
+    if (dir === 'left' || dir === 'right') {
+      e.preventDefault();
+      store.seekDays((dir === 'left' ? -1 : 1) * (e.shiftKey ? 7 : 1));
+    }
     return;
   }
   // 1 / 3 / 5 / 7 switch the day-column count — but not while typing in a field
