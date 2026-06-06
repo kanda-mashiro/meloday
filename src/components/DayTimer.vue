@@ -89,8 +89,8 @@ function adjust(delta: number): void {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.65rem;
-  padding: 1rem 1.25rem 1.1rem;
+  gap: 0.9rem;
+  padding: 1.1rem 1.35rem 1.2rem;
 }
 
 .timer__head {
@@ -167,9 +167,9 @@ function adjust(delta: number): void {
 }
 
 .timer__clock {
-  min-width: 5.6rem;
+  min-width: 4.8rem;
   text-align: center;
-  font-size: 2.4rem;
+  font-size: 2rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -220,8 +220,8 @@ function adjust(delta: number): void {
 }
 
 .timer__amb {
-  margin-top: 0.1rem;
-  padding-top: 0.7rem;
+  margin-top: 0.2rem;
+  padding-top: 0.95rem;
   border-top: 1px solid var(--divider);
 }
 
