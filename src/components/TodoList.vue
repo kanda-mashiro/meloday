@@ -7,7 +7,14 @@ import { usePreferences } from '../composables/usePreferences'
 import TodoItem from './TodoItem.vue'
 import TodoItemInput from './TodoItemInput.vue'
 
-const props = defineProps<{ listId: string; items: TodoItemType[]; focusable?: boolean }>()
+const props = defineProps<{
+  listId: string
+  items: TodoItemType[]
+  focusable?: boolean
+  // Keep the add-input always visible (single-day focus view), so adding still
+  // works when items fill the whole card and there's no empty space to click.
+  persistentAdd?: boolean
+}>()
 
 const store = useTodoStore()
 const { prefs } = usePreferences()
@@ -86,7 +93,7 @@ function onChange(event: DragChangeEvent) {
       </template>
       <template #footer>
         <TodoItemInput
-          v-show="adding"
+          v-show="adding || persistentAdd"
           ref="adder"
           :list-id="listId"
           @blur-empty="adding = false"

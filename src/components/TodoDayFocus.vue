@@ -44,7 +44,7 @@ const weekday = computed(() => formatDayOfWeek(props.day.date))
       </header>
 
       <div class="focus__list" :class="{ ruled: prefs.showLines }">
-        <TodoList :list-id="day.id" :items="day.items" :focusable="true" />
+        <TodoList :list-id="day.id" :items="day.items" :focusable="true" :persistent-add="true" />
       </div>
     </article>
   </div>
