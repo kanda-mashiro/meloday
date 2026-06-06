@@ -5,12 +5,11 @@ import { usePreferences } from '../composables/usePreferences'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth, formatDateId } from '../lib/date'
 import TodoList from './TodoList.vue'
 import TaskNotePanel from './TaskNotePanel.vue'
-import DayTimer from './DayTimer.vue'
 
 const props = defineProps<{ day: DayList }>()
 const { prefs } = usePreferences()
 
-// The workspace's right pane (note + timer) is open by default.
+// The workspace's right pane (the day note) is open by default.
 const paneOpen = ref(true)
 
 const subline = computed(
@@ -82,10 +81,10 @@ const progress = computed(() =>
         </div>
       </article>
 
-      <!-- RIGHT pane: day timer + free-form day note. Open by default.
-           @click.stop keeps any click inside the pane (timer buttons whose
-           v-if swaps the click target, the note editor, etc.) from bubbling to
-           the document-level click-away handler that clears the selection. -->
+      <!-- RIGHT pane: collapse-bar + free-form day note. Open by default.
+           @click.stop keeps any click inside the pane (the note editor, etc.)
+           from bubbling to the document-level click-away handler that clears
+           the selection. -->
       <aside v-if="paneOpen" class="focus__pane" @click.stop>
         <div class="focus__pane-bar">
           <button
@@ -98,7 +97,6 @@ const progress = computed(() =>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
         </div>
-        <DayTimer />
         <TaskNotePanel />
       </aside>
     </div>

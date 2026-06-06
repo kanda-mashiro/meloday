@@ -1,16 +1,78 @@
 <script setup lang="ts">
+import { ref, onBeforeUnmount } from 'vue'
 import { usePreferences } from '../composables/usePreferences'
 import { useDarkMode } from '../composables/useDarkMode'
 import { useHelp } from '../composables/useHelp'
+import { useDayTimer } from '../composables/useDayTimer'
+import DayTimer from './DayTimer.vue'
 
 const { prefs, columnOptions } = usePreferences()
 const { isDark, toggle } = useDarkMode()
 const { openHelp } = useHelp()
+const { running, mmss } = useDayTimer()
+
+// Pop-up panel anchored above the bottom-bar trigger.
+const focusWrap = ref<HTMLElement | null>(null)
+const focusOpen = ref(false)
+
+function onDocClick(e: MouseEvent): void {
+  if (focusWrap.value && !focusWrap.value.contains(e.target as Node)) closeFocus()
+}
+
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Escape') closeFocus()
+}
+
+function openFocus(): void {
+  if (focusOpen.value) return
+  focusOpen.value = true
+  // Defer so the click that opened the panel doesn't immediately close it.
+  window.setTimeout(() => {
+    document.addEventListener('click', onDocClick)
+    document.addEventListener('keydown', onKeydown)
+  }, 0)
+}
+
+function closeFocus(): void {
+  if (!focusOpen.value) return
+  focusOpen.value = false
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onKeydown)
+}
+
+function toggleFocus(): void {
+  if (focusOpen.value) closeFocus()
+  else openFocus()
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
   <footer class="bottom-bar">
-    <div class="bottom-bar__side" />
+    <div class="bottom-bar__side">
+      <div ref="focusWrap" class="focus-pop">
+        <button
+          class="bottom-bar__focus"
+          :class="{ '-running': running, '-open': focusOpen }"
+          type="button"
+          :title="running ? '专注计时 · 进行中' : '专注计时'"
+          aria-label="专注计时"
+          :aria-expanded="focusOpen"
+          @click="toggleFocus"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/></svg>
+          <span v-if="running" class="bottom-bar__focus-time">{{ mmss }}</span>
+          <span v-else>专注</span>
+        </button>
+        <div v-if="focusOpen" class="focus-pop__panel">
+          <DayTimer />
+        </div>
+      </div>
+    </div>
 
     <div class="bottom-bar__center">
       <div class="bottom-bar__seg" role="group" aria-label="Columns">
@@ -80,6 +142,66 @@ const { openHelp } = useHelp()
   display: flex;
   align-items: center;
   gap: 0.6rem;
+}
+
+/* Global focus-timer trigger + its pop-up panel, anchored in the left slot. */
+.focus-pop {
+  position: relative;
+}
+
+.bottom-bar__focus {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 3.4rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--main-border-light);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--aside-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.bottom-bar__focus:hover {
+  color: var(--main-text);
+}
+
+.bottom-bar__focus.-open {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--highlight-text);
+}
+
+/* Running state: accent fill + live countdown so it's glanceable anywhere. */
+.bottom-bar__focus.-running {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.bottom-bar__focus.-running:hover {
+  color: #fff;
+}
+
+.bottom-bar__focus-time {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.focus-pop__panel {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 0.5rem;
+  background: var(--panel-bg);
+  border: 1px solid var(--main-border-light);
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.18);
+  padding: 0.3rem;
 }
 
 .bottom-bar__seg {
