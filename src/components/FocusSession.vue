@@ -169,16 +169,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                 <span class="fs__scene-label">{{ s.label }}</span>
               </button>
             </div>
-            <input
-              class="fs__sound-vol"
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              :value="soundVolume"
-              aria-label="音量"
-              @input="onVolume"
-            />
+            <div class="fs__vol">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></svg>
+              <input
+                class="fs__sound-vol"
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                :value="soundVolume"
+                aria-label="音量"
+                @input="onVolume"
+              />
+            </div>
           </template>
         </div>
       </div>
@@ -334,15 +337,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   margin-top: 0.6rem;
   padding-top: 1rem;
   border-top: 1px solid var(--divider);
-  width: min(420px, 100%);
+  width: min(480px, 100%);
 }
 
 .fs__sound {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.55rem 0.7rem;
+  gap: 0.75rem;
+  width: 100%;
 }
 
 .fs__sound-toggle {
@@ -372,17 +375,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 }
 
 .fs__scenes {
-  display: inline-flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.3rem;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+  width: 100%;
 }
 
 .fs__scene {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.3em;
-  padding: 0.28rem 0.6rem;
+  padding: 0.32rem 0.5rem;
   border: 1px solid var(--main-border-light);
   border-radius: 999px;
   background: transparent;
@@ -414,8 +418,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   display: block;
 }
 
+.fs__vol {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  color: var(--aside-text);
+}
+
+.fs__vol svg {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
 .fs__sound-vol {
-  width: 6.5rem;
+  flex: 1 1 auto;
   accent-color: var(--accent);
   cursor: pointer;
 }
