@@ -18,3 +18,12 @@ export function tagHue(tag: string): number {
   }
   return hash % 360
 }
+
+export type PriorityLevel = 'p0' | 'p1' | 'p2'
+const PRIORITY_LEVELS: readonly string[] = ['p0', 'p1', 'p2']
+
+/** If `tag` names a priority (p0/p1/p2), return it lowercased, else null. */
+export function priorityLevel(tag: string): PriorityLevel | null {
+  const k = tag.toLowerCase()
+  return PRIORITY_LEVELS.includes(k) ? (k as PriorityLevel) : null
+}

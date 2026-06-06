@@ -4,7 +4,7 @@ import type { User } from '@supabase/supabase-js'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { supabase, isConfigured, appendInboxItem } from './supabase'
-import { buildLabel, tagHue } from './tags'
+import { buildLabel, tagHue, priorityLevel } from './tags'
 
 const appWindow = getCurrentWindow()
 
@@ -222,9 +222,9 @@ onMounted(async () => {
       <span
         v-for="(t, i) in tags"
         :key="i"
-        class="cap__chip"
-        :style="{ '--tag-h': tagHue(t) }"
-      >#{{ t }}<button
+        :class="priorityLevel(t) ? ['cap__prio', `-${priorityLevel(t)}`] : 'cap__chip'"
+        :style="priorityLevel(t) ? undefined : { '--tag-h': tagHue(t) }"
+      >{{ priorityLevel(t) ? priorityLevel(t)?.toUpperCase() : '#' + t }}<button
           class="cap__chip-x"
           type="button"
           aria-label="移除标签"
@@ -291,6 +291,30 @@ onMounted(async () => {
   font-weight: 600;
   background: hsl(var(--tag-h, 40) 32% 26%);
   color: hsl(var(--tag-h, 40) 80% 82%);
+}
+
+.cap__prio {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.cap__prio.-p0 {
+  background: #e0524e;
+}
+
+.cap__prio.-p1 {
+  background: #e07b39;
+}
+
+.cap__prio.-p2 {
+  background: #6b7a90;
 }
 
 .cap__chip-x {
