@@ -28,7 +28,7 @@ const { openCapture } = useQuickCapture();
 const { user, ready, hasPassword, forceSetPassword } = useAuth();
 // Initialize the sync engine (watches auth, owns the per-user cache + cloud).
 useSync();
-const { prefs } = usePreferences();
+const { prefs, columnOptions } = usePreferences();
 const store = useTodoStore();
 const selection = useSelection();
 const { toggleHelp } = useHelp();
@@ -133,12 +133,18 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     }
     return;
   }
-  // 1 / 3 / 5 / 7 switch the day-column count — but not while typing in a field
-  // and not when a modifier is held (so ⌘1 etc. stay with the browser).
-  if (!e.metaKey && !e.ctrlKey && !e.altKey && ['1', '3', '5', '7'].includes(e.key)) {
+  // [ / ] step the day-column count narrower / wider through 1·3·5·7 (clamped),
+  // unless typing in a field or a modifier is held.
+  if (e.key === '[' || e.key === ']') {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     const el = e.target as HTMLElement;
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
-    prefs.columns = Number(e.key);
+    e.preventDefault();
+    const i = columnOptions.indexOf(prefs.columns);
+    const cur = i < 0 ? 0 : i;
+    const next =
+      e.key === '[' ? Math.max(0, cur - 1) : Math.min(columnOptions.length - 1, cur + 1);
+    prefs.columns = columnOptions[next];
   }
 }
 

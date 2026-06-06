@@ -32,7 +32,7 @@ const { openHelp } = useHelp()
           class="bottom-bar__seg-btn"
           :class="{ '-active': prefs.columns === n }"
           type="button"
-          :title="`${n} 天 · 快捷键 ${n}`"
+          :title="`${n} 天`"
           @click="prefs.columns = n"
         >
           {{ n }}
