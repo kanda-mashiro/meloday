@@ -89,8 +89,8 @@ function adjust(delta: number): void {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.8rem 1rem 0.9rem;
+  gap: 0.65rem;
+  padding: 1rem 1.25rem 1.1rem;
 }
 
 .timer__head {
@@ -167,9 +167,9 @@ function adjust(delta: number): void {
 }
 
 .timer__clock {
-  min-width: 4.6rem;
+  min-width: 5.6rem;
   text-align: center;
-  font-size: 2rem;
+  font-size: 2.4rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.02em;
