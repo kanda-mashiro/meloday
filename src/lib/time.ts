@@ -1,15 +1,18 @@
-// Inline time support. A todo label can carry a time at the start of its body
-// (e.g. "13:30-14:00 开会") or anywhere with an explicit "@" (e.g. "复盘 @15:00").
-// Like tags, this only affects rendering + sorting; the label text is untouched.
+// Inline time support. A todo label can carry a time anywhere in its body — just
+// type it (e.g. "13:30 开会", "复盘 15:00-16:00", "和老板 14:00 对齐"). Like tags,
+// this only affects rendering + sorting; the label text is untouched.
 
 import { parseLabel } from './tags'
 
 // A valid 24h time: 00:00–23:59, two-digit minutes.
 const T = '(?:[01]?\\d|2[0-3]):[0-5]\\d'
-// Leading time at the start of the body (optionally a range).
-const LEADING_RE = new RegExp(`^(\\s*)(${T})(?:\\s*[-–~到至]\\s*(${T}))?`)
-// "@time" anywhere (global).
-const AT_RE = new RegExp(`@\\s*(${T})(?:\\s*[-–~到至]\\s*(${T}))?`, 'g')
+// A bare time anywhere in the body (optionally a range, e.g. "13:30" or
+// "13:30-14:00"). The look-behind/ahead keep it from matching inside a longer
+// digit run (ports, HH:MM:SS, etc.).
+const TIME_RE = new RegExp(
+  `(?<![\\d:])(${T})(?:\\s*[-–~到至]\\s*(${T}))?(?![\\d:])`,
+  'g',
+)
 
 export interface TimeInfo {
   /** Start time in minutes since midnight. */
@@ -59,13 +62,13 @@ function emitText(text: string, out: RichSegment[]): void {
   if (trail) out.push({ kind: 'text', text: trail })
 }
 
-// Split a string into text / time segments on "@time" occurrences.
-function scanAt(text: string, onTime: (t: TimeInfo) => void): RichSegment[] {
+// Split a string into text / time segments on bare time occurrences.
+function scanTimes(text: string, onTime: (t: TimeInfo) => void): RichSegment[] {
   const segs: RichSegment[] = []
   let last = 0
-  AT_RE.lastIndex = 0
+  TIME_RE.lastIndex = 0
   let m: RegExpExecArray | null
-  while ((m = AT_RE.exec(text))) {
+  while ((m = TIME_RE.exec(text))) {
     if (m.index > last) emitText(text.slice(last, m.index), segs)
     const time = makeTime(m[1], m[2] ?? null)
     onTime(time)
@@ -79,7 +82,7 @@ function scanAt(text: string, onTime: (t: TimeInfo) => void): RichSegment[] {
 export interface ParsedRich {
   segments: RichSegment[]
   tags: string[]
-  /** The primary time (leading or first @), used for sorting. */
+  /** The primary (first) time in the label, used for sorting. */
   time: TimeInfo | null
 }
 
@@ -87,7 +90,6 @@ export function parseLabelRich(label: string): ParsedRich {
   const base = parseLabel(label)
   const out: RichSegment[] = []
   let primary: TimeInfo | null = null
-  let bodyStarted = false
 
   const claim = (t: TimeInfo) => {
     if (!primary) primary = t
@@ -98,27 +100,7 @@ export function parseLabelRich(label: string): ParsedRich {
       out.push({ kind: 'tag', text: seg.text, tag: seg.tag })
       continue
     }
-
-    const text = seg.text
-
-    // Leading bare time, only at the very start of the body.
-    if (!bodyStarted && text.trim() !== '') {
-      bodyStarted = true
-      const lead = LEADING_RE.exec(text)
-      if (lead) {
-        const ws = lead[1]
-        const start = lead[2]
-        const end = lead[3] ?? null
-        if (ws) out.push({ kind: 'text', text: ws })
-        const time = makeTime(start, end)
-        claim(time)
-        out.push({ kind: 'time', text: display(start, end), time })
-        out.push(...scanAt(text.slice(lead[0].length), claim))
-        continue
-      }
-    }
-
-    out.push(...scanAt(text, claim))
+    out.push(...scanTimes(seg.text, claim))
   }
 
   return { segments: out, tags: base.tags, time: primary }
