@@ -5,7 +5,7 @@ import { useTodoStore } from '../composables/useTodoStore'
 import { useTagFilter } from '../composables/useTagFilter'
 import { useNotes } from '../composables/useNotes'
 import { useFocusSession } from '../composables/useFocusSession'
-import { hasTag, tagHue } from '../lib/tags'
+import { hasTag, tagHue, priorityLevel, topPriority } from '../lib/tags'
 import { parseLabelRich } from '../lib/time'
 import TaskMoveMenu from './TaskMoveMenu.vue'
 import { useSelection } from '../composables/useSelection'
@@ -30,7 +30,10 @@ function startFocus(): void {
   focusSession.start({ id: props.item.id, label: props.item.label })
 }
 
-const segments = computed(() => parseLabelRich(props.item.label).segments)
+const parsed = computed(() => parseLabelRich(props.item.label))
+const segments = computed(() => parsed.value.segments)
+// Highest priority tag on this task (p0 > p1 > p2) — drives the row accent.
+const priority = computed(() => topPriority(parsed.value.tags))
 
 const hasNote = computed(() => notes.hasNote(props.item.id))
 
@@ -116,7 +119,7 @@ function closeMenu(): void {
 <template>
   <div
     class="todo-item"
-    :class="{ '-done': item.done, '-dim': dimmed, '-selected': selected }"
+    :class="[{ '-done': item.done, '-dim': dimmed, '-selected': selected }, priority ? `-prio-${priority}` : '']"
     @contextmenu.prevent="openMenu($event)"
   >
     <button
@@ -148,7 +151,12 @@ function closeMenu(): void {
       :title="item.label"
       @click.stop="onLabelClick"
     ><template v-for="(seg, i) in segments" :key="i"><span
-        v-if="seg.kind === 'tag'"
+        v-if="seg.kind === 'tag' && priorityLevel(seg.tag ?? '')"
+        class="prio-badge"
+        :class="[`-${priorityLevel(seg.tag ?? '')}`, { '-on': activeTag === seg.tag?.toLowerCase() }]"
+        @click.stop="seg.tag && toggleTag(seg.tag)"
+      >{{ priorityLevel(seg.tag ?? '')?.toUpperCase() }}</span><span
+        v-else-if="seg.kind === 'tag'"
         class="tag-chip"
         :class="{ '-on': activeTag === seg.tag?.toLowerCase() }"
         :style="{ '--tag-h': tagHue(seg.tag ?? '') }"
@@ -439,5 +447,60 @@ function closeMenu(): void {
 
 .todo-item:hover .todo-item__delete {
   visibility: visible;
+}
+
+/* Priority tags (#p0/#p1/#p2): fixed-color badges, plus a left accent strip on
+   the row for p0/p1 so urgent tasks stand out when scanning the board. p2 is a
+   quiet badge only. */
+.prio-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.06rem 0.4rem;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  cursor: pointer;
+}
+
+.prio-badge.-p0 {
+  background: #e0524e;
+}
+
+.prio-badge.-p1 {
+  background: #e07b39;
+}
+
+.prio-badge.-p2 {
+  background: #6b7a90;
+}
+
+.prio-badge.-on {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65);
+}
+
+.todo-item.-prio-p0,
+.todo-item.-prio-p1 {
+  position: relative;
+}
+
+.todo-item.-prio-p0::before,
+.todo-item.-prio-p1::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.todo-item.-prio-p0::before {
+  background: #e0524e;
+}
+
+.todo-item.-prio-p1::before {
+  background: #e07b39;
 }
 </style>
