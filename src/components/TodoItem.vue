@@ -452,39 +452,8 @@ function closeMenu(): void {
   visibility: visible;
 }
 
-/* Priority tags (#p0/#p1/#p2): fixed-color badges + a matching left accent strip
-   on the row, so importance reads at a glance when scanning the board. */
-.prio-badge {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 0.12em;
-  padding: 0.02em 0.45em;
-  border-radius: 5px;
-  font-size: 0.72em;
-  line-height: 1.5;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  color: #fff;
-  cursor: pointer;
-}
-
-.prio-badge.-p0 {
-  background: #e0524e;
-}
-
-.prio-badge.-p1 {
-  background: #e07b39;
-}
-
-.prio-badge.-p2 {
-  background: #6b7a90;
-}
-
-.prio-badge.-on {
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65);
-}
-
+/* Priority tags (#p0/#p1/#p2): a matching left accent strip on the row. The
+   .prio-badge chip itself is styled globally (shared with the tag input). */
 .todo-item.-prio-p0,
 .todo-item.-prio-p1,
 .todo-item.-prio-p2 {

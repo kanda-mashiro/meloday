@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useTodoStore } from '../composables/useTodoStore'
-import { buildLabel, tagHue } from '../lib/tags'
+import { buildLabel, tagHue, priorityLevel } from '../lib/tags'
 
 const props = defineProps<{ listId: string }>()
 const emit = defineEmits<{ blurEmpty: []; captured: [] }>()
@@ -122,9 +122,11 @@ function submit(): void {
     <span
       v-for="(t, i) in tags"
       :key="i"
-      class="tag-chip -static"
-      :style="{ '--tag-h': tagHue(t) }"
-    >#{{ t }}<button
+      :class="
+        priorityLevel(t) ? ['prio-badge', '-static', `-${priorityLevel(t)}`] : ['tag-chip', '-static']
+      "
+      :style="priorityLevel(t) ? undefined : { '--tag-h': tagHue(t) }"
+    >{{ priorityLevel(t) ? priorityLevel(t)?.toUpperCase() : '#' + t }}<button
         class="todo-item-input__x"
         type="button"
         aria-label="Remove tag"
