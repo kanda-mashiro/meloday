@@ -154,7 +154,7 @@ onBeforeUnmount(() => {
     <div
       class="move-menu__group"
       @mouseenter="submenuOpen = true"
-      @mouseleave="submenuOpen = false"
+      @mouseleave="submenuOpen = showCalendar"
     >
       <button class="move-menu__item" type="button" role="menuitem" @click="submenuOpen = true">
         <svg class="move-menu__icon" viewBox="0 0 16 16" aria-hidden="true">
