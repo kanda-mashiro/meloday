@@ -457,11 +457,14 @@ function closeMenu(): void {
 .prio-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.06rem 0.4rem;
+  margin: 0 0.12em;
+  padding: 0.02em 0.45em;
   border-radius: 5px;
-  font-size: 0.7rem;
+  font-size: 0.72em;
+  line-height: 1.5;
   font-weight: 800;
   letter-spacing: 0.04em;
+  white-space: nowrap;
   color: #fff;
   cursor: pointer;
 }

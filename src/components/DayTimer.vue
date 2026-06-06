@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useDayTimer } from '../composables/useDayTimer'
 import AmbientControls from './AmbientControls.vue'
 
@@ -7,6 +8,15 @@ import AmbientControls from './AmbientControls.vue'
 // one clock.
 const { presets, presetMin, running, ready, finished, mmss, setPreset, start, pause, reset } =
   useDayTimer()
+
+// Any minutes value works; the quick pills are just shortcuts. The custom field
+// counts as "active" whenever the current length isn't one of the presets.
+const isCustom = computed(() => !presets.some((p) => p === presetMin.value))
+function onCustom(e: Event): void {
+  const n = parseInt((e.target as HTMLInputElement).value, 10)
+  if (!Number.isFinite(n)) return
+  setPreset(Math.min(180, Math.max(1, n)))
+}
 </script>
 
 <template>
@@ -26,6 +36,19 @@ const { presets, presetMin, running, ready, finished, mmss, setPreset, start, pa
       >
         {{ p }}<span class="timer__preset-unit">分</span>
       </button>
+      <label class="timer__custom" :class="{ '-on': isCustom }" title="自定义时长（分钟）">
+        <input
+          class="timer__custom-input"
+          type="number"
+          min="1"
+          max="180"
+          inputmode="numeric"
+          placeholder="自定"
+          :value="isCustom ? presetMin : ''"
+          @change="onCustom"
+        />
+        <span class="timer__preset-unit">分</span>
+      </label>
     </div>
 
     <div class="timer__clock" :class="{ '-done': finished }">{{ mmss }}</div>
@@ -111,6 +134,49 @@ const { presets, presetMin, running, ready, finished, mmss, setPreset, start, pa
   margin-left: 0.1em;
   font-size: 0.7em;
   opacity: 0.7;
+}
+
+/* Custom-duration field — type any minute count; it lights up like an active
+   preset while the fixed pills go quiet. */
+.timer__custom {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--main-border-light);
+  border-radius: 999px;
+  color: var(--aside-text);
+  cursor: text;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.timer__custom.-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--highlight-text);
+}
+
+.timer__custom-input {
+  width: 2.4rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.timer__custom-input::-webkit-outer-spin-button,
+.timer__custom-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.timer__custom-input::placeholder {
+  color: var(--disabled-text);
 }
 
 .timer__clock {
