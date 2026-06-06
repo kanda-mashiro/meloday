@@ -363,7 +363,7 @@ onBeforeUnmount(() => {
   <div v-else class="app">
     <div class="app__accent" />
 
-    <AppHeader v-if="!focusMode" @preferences="prefsOpen = true" @history="archiveOpen = true" />
+    <AppHeader @preferences="prefsOpen = true" @history="archiveOpen = true" />
 
     <PreferencesPanel :open="prefsOpen" @close="prefsOpen = false" />
 

@@ -9,7 +9,7 @@ import DayTimer from './DayTimer.vue'
 const { prefs, columnOptions } = usePreferences()
 const { isDark, toggle } = useDarkMode()
 const { openHelp } = useHelp()
-const { running, mmss } = useDayTimer()
+const { running, finished } = useDayTimer()
 
 // Pop-up panel anchored above the bottom-bar trigger.
 const focusWrap = ref<HTMLElement | null>(null)
@@ -57,16 +57,17 @@ onBeforeUnmount(() => {
       <div ref="focusWrap" class="focus-pop">
         <button
           class="bottom-bar__focus"
-          :class="{ '-running': running, '-open': focusOpen }"
+          :class="{ '-running': running, '-finished': finished, '-open': focusOpen }"
           type="button"
-          :title="running ? '专注计时 · 进行中' : '专注计时'"
+          :title="finished ? '专注结束' : running ? '专注计时 · 进行中' : '专注计时'"
           aria-label="专注计时"
           :aria-expanded="focusOpen"
           @click="toggleFocus"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/></svg>
-          <span v-if="running" class="bottom-bar__focus-time">{{ mmss }}</span>
-          <span v-else>专注</span>
+          <span>专注</span>
+          <span v-if="running" class="bottom-bar__focus-dot" aria-hidden="true"></span>
+          <svg v-else-if="finished" class="bottom-bar__focus-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>
         </button>
         <div v-if="focusOpen" class="focus-pop__panel">
           <DayTimer />
@@ -176,20 +177,49 @@ onBeforeUnmount(() => {
   color: var(--highlight-text);
 }
 
-/* Running state: accent fill + live countdown so it's glanceable anywhere. */
+/* Running state stays deliberately quiet: no ticking digits (a moving clock
+   breaks flow and creates anxiety). Just a small accent dot to signal a
+   session is on; the actual time is only shown when you open the panel. */
 .bottom-bar__focus.-running {
-  background: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--main-border-light));
+  color: var(--main-text);
+}
+
+/* Finished: a calm, static "done" badge that lingers until you act on it. */
+.bottom-bar__focus.-finished {
   border-color: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--highlight-text);
 }
 
-.bottom-bar__focus.-running:hover {
-  color: #fff;
+.bottom-bar__focus-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+  /* A slow "breathing" pulse — a calm sign of life, not a ticking countdown. */
+  animation: focus-breathe 2.8s ease-in-out infinite;
 }
 
-.bottom-bar__focus-time {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+.bottom-bar__focus-check {
+  width: 0.9em;
+  height: 0.9em;
+  display: block;
+}
+
+@keyframes focus-breathe {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.32;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-bar__focus-dot {
+    animation: none;
+  }
 }
 
 .focus-pop__panel {
@@ -197,6 +227,11 @@ onBeforeUnmount(() => {
   left: 0;
   bottom: 100%;
   margin-bottom: 0.5rem;
+  /* Size to content so the timer row and the 5-column ambient grid both lay out
+     without being crushed into wrapping; cap to the viewport. */
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  box-sizing: border-box;
   background: var(--panel-bg);
   border: 1px solid var(--main-border-light);
   border-radius: 12px;

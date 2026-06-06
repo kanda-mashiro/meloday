@@ -106,9 +106,10 @@ const progress = computed(() =>
 <style scoped>
 .focus {
   flex: 1 1 auto;
-  /* Fill the area below the day-nav so the muted backdrop covers the screen
-     (the global header is hidden in focus mode). */
-  min-height: calc(100vh - 7rem);
+  /* Fill the area below the global header + day-nav so the muted backdrop covers
+     the screen. --header-h tracks the now-always-visible AppHeader. */
+  --header-h: 3.6rem;
+  min-height: calc(100vh - 7rem - var(--header-h));
   display: flex;
   justify-content: center;
   overflow-y: auto;
@@ -140,7 +141,7 @@ const progress = computed(() =>
   flex-direction: column;
   /* Fill the viewport like the side pane when the list is short (so the two
      panes line up); grow taller and scroll when the list is long. */
-  min-height: calc(100vh - 9rem);
+  min-height: calc(100vh - 9rem - var(--header-h));
   padding: 1.6rem 1.75rem 2.5rem;
   background: var(--main-bg);
   border: 1px solid var(--divider);
@@ -157,7 +158,7 @@ const progress = computed(() =>
   align-self: flex-start;
   position: sticky;
   top: 0;
-  height: calc(100vh - 9rem);
+  height: calc(100vh - 9rem - var(--header-h));
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);

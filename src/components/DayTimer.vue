@@ -85,6 +85,7 @@ const { presets, presetMin, running, ready, finished, mmss, setPreset, start, pa
 .timer__preset {
   min-width: 2.9rem;
   padding: 0.3rem 0.55rem;
+  white-space: nowrap;
   border: 1px solid var(--main-border-light);
   border-radius: 999px;
   background: transparent;
@@ -135,6 +136,7 @@ const { presets, presetMin, running, ready, finished, mmss, setPreset, start, pa
   align-items: center;
   gap: 0.35em;
   padding: 0.45rem 0.95rem;
+  white-space: nowrap;
   border: 1px solid var(--main-border-light);
   border-radius: 8px;
   background: transparent;
