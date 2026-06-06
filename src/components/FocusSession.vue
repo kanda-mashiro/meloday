@@ -12,6 +12,7 @@ const {
   mmss,
   running,
   finished,
+  ready,
   presets,
   setPreset,
   pause,
@@ -44,6 +45,12 @@ const segments = computed<RichSegment[]>(() =>
   target.value ? parseLabelRich(target.value.label).segments : [],
 )
 
+const phaseLabel = computed(() => {
+  if (finished.value) return '专注结束'
+  if (ready.value) return '准备专注'
+  return running.value ? '正在专注' : '已暂停'
+})
+
 function openNote(): void {
   if (target.value) notes.open({ id: target.value.id, label: target.value.label })
 }
@@ -68,7 +75,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <div class="fs__scrim" />
 
     <div class="fs__panel">
-      <p class="fs__eyebrow">正在专注</p>
+      <p class="fs__eyebrow">{{ phaseLabel }}</p>
 
       <h2 class="fs__task"><template v-for="(seg, i) in segments" :key="i"><span
             v-if="seg.kind === 'tag'"
@@ -84,9 +91,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         {{ finished ? '时间到' : mmss }}
       </div>
 
-      <!-- Duration presets: only while not running. Changing a preset resets the
-           clock, which is confusing mid-session — pause first to re-pick. -->
-      <div v-if="!running" class="fs__presets">
+      <!-- Duration presets: only in the ready (pre-start) state. Once the run
+           begins they're hidden — you commit to a length up front. -->
+      <div v-if="ready" class="fs__presets">
         <button
           v-for="p in presets"
           :key="p"
@@ -100,11 +107,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       </div>
 
       <div class="fs__controls">
-        <button v-if="running" class="fs__btn" type="button" @click="pause"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>暂停</button>
-        <button v-else class="fs__btn" type="button" :disabled="finished" @click="resume">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M7 5l13 7-13 7z"/></svg>继续
-        </button>
-        <button class="fs__btn -primary" type="button" @click="complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>完成</button>
+        <button v-if="ready" class="fs__btn -primary" type="button" @click="resume"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M7 5l13 7-13 7z"/></svg>开始专注</button>
+        <template v-else>
+          <button v-if="running" class="fs__btn" type="button" @click="pause"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>暂停</button>
+          <button v-else class="fs__btn" type="button" :disabled="finished" @click="resume"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M7 5l13 7-13 7z"/></svg>继续</button>
+          <button class="fs__btn -primary" type="button" @click="complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>完成</button>
+        </template>
       </div>
 
       <!-- Secondary zone: deliberately quiet so the task + clock stay the focus.

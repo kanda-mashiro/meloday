@@ -37,11 +37,13 @@ function runTicker(): void {
   }, 1000)
 }
 
-/** Focus a specific task (any order) and start its countdown. */
+/** Focus a specific task. Opens paused at the chosen length so you can pick a
+ *  duration (and turn on sound) before the clock starts. */
 function start(t: FocusTarget): void {
   target.value = t
   remaining.value = presetMin.value * 60
-  runTicker()
+  running.value = false
+  clearTicker()
 }
 
 /** Pick a pomodoro length; resets the clock to that length. */
@@ -83,6 +85,12 @@ const mmss = computed(() => {
 
 const finished = computed(() => target.value !== null && remaining.value <= 0)
 
+// Fresh, un-started state: clock at full length and not ticking. Drives the
+// "pick a duration + Start" setup view shown before the run begins.
+const ready = computed(
+  () => target.value !== null && !running.value && remaining.value === presetMin.value * 60,
+)
+
 /**
  * A single-task focus session: pick any task, run a pomodoro on it, then mark
  * it done or just leave. Module singleton so the trigger (a list row) and the
@@ -95,6 +103,7 @@ export function useFocusSession(): {
   running: Ref<boolean>
   mmss: ComputedRef<string>
   finished: ComputedRef<boolean>
+  ready: ComputedRef<boolean>
   presets: readonly number[]
   start: (t: FocusTarget) => void
   setPreset: (min: number) => void
@@ -110,6 +119,7 @@ export function useFocusSession(): {
     running,
     mmss,
     finished,
+    ready,
     presets: FOCUS_PRESETS,
     start,
     setPreset,
