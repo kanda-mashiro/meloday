@@ -63,7 +63,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div v-if="target" class="fs" role="dialog" aria-modal="true" aria-label="专注">
-    <div class="fs__scrim" @click="exit" />
+    <!-- Backdrop is non-dismissing on purpose: a focus session is deliberate, so
+         leaving is via Esc or the explicit 退出 button, not a stray blank click. -->
+    <div class="fs__scrim" />
 
     <div class="fs__panel">
       <p class="fs__eyebrow">正在专注</p>
@@ -135,9 +137,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               >
                 <span class="fs__scene-ic" aria-hidden="true">
                   <svg v-if="s.id === 'rain'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 14.5A4.5 4.5 0 0 1 7 5.6a5.5 5.5 0 0 1 10.3 1.2A3.6 3.6 0 0 1 17 14.5"/><path d="M8 17.5 7 20M12 17.5 11 20.5M16 17.5 15 20"/></svg>
+                  <svg v-else-if="s.id === 'thunder'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 13A4.5 4.5 0 0 1 7 4.1a5.5 5.5 0 0 1 10.3 1.2A3.6 3.6 0 0 1 17 13"/><path d="M12 11l-2.5 4H12l-2 4.5"/></svg>
                   <svg v-else-if="s.id === 'ocean'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M2 13c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M2 17.5c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/></svg>
+                  <svg v-else-if="s.id === 'stream'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 3c-3 3.2 6 5 3 9.5s-6 5.3-3 9.5"/></svg>
+                  <svg v-else-if="s.id === 'wind'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9a2.4 2.4 0 1 0-2.4-2.4"/><path d="M3 12h13a2.6 2.6 0 1 1-2.6 2.6"/><path d="M3 16h7"/></svg>
                   <svg v-else-if="s.id === 'cafe'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13v4a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 3.5c-.6.8-.6 1.7 0 2.5M12 3.5c-.6.8-.6 1.7 0 2.5"/></svg>
                   <svg v-else-if="s.id === 'forest'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 7 10h3l-4 6h12l-4-6h3z"/><path d="M12 16v4.5"/></svg>
+                  <svg v-else-if="s.id === 'birds'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11c1.3-1.9 2.7-1.9 4 0 1.3-1.9 2.7-1.9 4 0"/><path d="M14 7.5c1-1.4 2-1.4 3 0 1-1.4 2-1.4 3 0"/></svg>
+                  <svg v-else-if="s.id === 'night'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8 8 0 1 1 10.5 4a6.2 6.2 0 0 0 9.5 9.5z"/></svg>
                   <svg v-else-if="s.id === 'fire'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.5 3-2 4.2-2.8 6A4.8 4.8 0 0 0 12 18a4.8 4.8 0 0 0 4.5-6.5C15.3 13 14.5 12 14.8 9.5 15 7 13.5 4.5 12 3z"/></svg>
                   <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5.5a9 9 0 0 1 0 13"/></svg>
                 </span>

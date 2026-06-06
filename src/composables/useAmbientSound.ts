@@ -1,29 +1,33 @@
 import { ref, type Ref } from 'vue'
 
 // Ambient focus sound, picked by SCENE rather than noise "color" (ordinary users
-// think "rain"/"ocean", not "pink/brown"). Most scenes are backed by a small
-// looping audio file under public/sounds/<id>.mp3; the "white" scene is the
-// original Web-Audio-synthesized white noise (no file — works offline, nothing
-// to host). Decoded buffers are cached and made seamlessly loopable with the
-// same 50ms equal-overlap crossfade the synth uses.
+// think "rain"/"ocean", not "pink/brown"). Each scene is a looping audio file
+// under public/sounds/<id>.mp3, lazily fetched on first use. Decoded buffers are
+// cached and made seamlessly loopable with a 50ms equal-overlap crossfade.
 
-export type SceneId = 'rain' | 'ocean' | 'cafe' | 'forest' | 'fire' | 'white'
+export type SceneId =
+  | 'rain' | 'thunder' | 'ocean' | 'stream' | 'wind'
+  | 'forest' | 'birds' | 'night' | 'fire' | 'cafe'
 
 export interface Scene {
   id: SceneId
   label: string
-  /** Source file under /sounds; absent for the synthesized scene. */
-  file?: string
+  /** Source file under /sounds. */
+  file: string
 }
 
-// Order = display order. "white" last: it's the synth fallback, always available.
+// Order = display order.
 export const SCENES: readonly Scene[] = [
   { id: 'rain', label: '雨声', file: '/sounds/rain.mp3' },
+  { id: 'thunder', label: '雷雨', file: '/sounds/thunder.mp3' },
   { id: 'ocean', label: '海浪', file: '/sounds/ocean.mp3' },
-  { id: 'cafe', label: '咖啡馆', file: '/sounds/cafe.mp3' },
+  { id: 'stream', label: '溪流', file: '/sounds/stream.mp3' },
+  { id: 'wind', label: '微风', file: '/sounds/wind.mp3' },
   { id: 'forest', label: '森林', file: '/sounds/forest.mp3' },
+  { id: 'birds', label: '鸟鸣', file: '/sounds/birds.mp3' },
+  { id: 'night', label: '虫鸣', file: '/sounds/night.mp3' },
   { id: 'fire', label: '篝火', file: '/sounds/fire.mp3' },
-  { id: 'white', label: '白噪音' },
+  { id: 'cafe', label: '咖啡馆', file: '/sounds/cafe.mp3' },
 ] as const
 
 const SCENE_IDS = SCENES.map((s) => s.id) as SceneId[]
@@ -68,8 +72,7 @@ let source: AudioBufferSourceNode | null = null
 // of being played, so a slow fetch can't resurrect a scene the user left.
 let playToken = 0
 
-// Decoded-and-loopable buffers, keyed by scene id. The synth scene is generated
-// fresh each play (cheap, and keeps the noise from repeating identically).
+// Decoded-and-loopable buffers, keyed by scene id.
 const bufferCache = new Map<SceneId, AudioBuffer>()
 
 function ensureContext(): void {
@@ -85,8 +88,8 @@ const FADE_SECONDS = 0.05 // 50ms loop crossfade
 // Seamless loop: equal-overlap crossfade so the wrap from the last sample back
 // to the first has no click. The buffer must carry `fade` samples of extra tail
 // (the would-be continuation past the loop point) which we blend into the head;
-// the returned buffer is exactly `len` long. Works for synth noise and decoded
-// files alike. Multi-channel buffers are handled per channel.
+// the returned buffer is exactly `len` long. Multi-channel buffers are handled
+// per channel.
 function makeLoopable(c: AudioContext, channels: Float32Array[], len: number, fade: number): AudioBuffer {
   const buf = c.createBuffer(channels.length, len, c.sampleRate)
   for (let ch = 0; ch < channels.length; ch++) {
@@ -99,16 +102,6 @@ function makeLoopable(c: AudioContext, channels: Float32Array[], len: number, fa
     }
   }
   return buf
-}
-
-// A few seconds of looped noise — long enough that the loop isn't audible.
-function makeSynthBuffer(c: AudioContext): AudioBuffer {
-  const len = Math.floor(c.sampleRate * 4)
-  const fade = Math.floor(c.sampleRate * FADE_SECONDS)
-  const total = len + fade
-  const out = new Float32Array(total)
-  for (let i = 0; i < total; i++) out[i] = (Math.random() * 2 - 1) * 0.5
-  return makeLoopable(c, [out], len, fade)
 }
 
 // Turn a decoded file buffer into a seamless loop. We need `fade` samples of
@@ -130,7 +123,6 @@ function makeFileLoopable(c: AudioContext, decoded: AudioBuffer): AudioBuffer {
 async function loadSceneBuffer(c: AudioContext, s: Scene): Promise<AudioBuffer | null> {
   const cached = bufferCache.get(s.id)
   if (cached) return cached
-  if (!s.file) return null
   try {
     const res = await fetch(s.file)
     if (!res.ok) return null
@@ -154,21 +146,18 @@ function playBuffer(buffer: AudioBuffer): void {
   source.start()
 }
 
-// (Re)start playback for the current scene. File scenes load asynchronously; the
-// captured token guards against a stale resolution. If a file scene can't load,
-// fall back to the synth white noise so the toggle still does *something* audible.
+// (Re)start playback for the current scene. Scenes load asynchronously; the
+// captured token guards against a stale resolution (a slow fetch resolving after
+// the user switched scene or stopped). If the file can't load, stay silent
+// rather than substitute noise.
 function startScene(): void {
   const c = ctx as AudioContext
   const token = ++playToken
   const current = SCENES.find((s) => s.id === scene.value)
-  if (!current || current.id === 'white' || !current.file) {
-    playBuffer(makeSynthBuffer(c))
-    return
-  }
+  if (!current) return
   void loadSceneBuffer(c, current).then((buf) => {
     if (token !== playToken || !playing.value) return // user moved on
     if (buf) playBuffer(buf)
-    else playBuffer(makeSynthBuffer(c)) // graceful fallback
   })
 }
 
