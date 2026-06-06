@@ -228,8 +228,10 @@ onBeforeUnmount(() => {
   bottom: 100%;
   margin-bottom: 0.5rem;
   /* Size to content so the timer row and the 5-column ambient grid both lay out
-     without being crushed into wrapping; cap to the viewport. */
+     without being crushed into wrapping; a min-width keeps the collapsed panel
+     comfortably wide, and capped to the viewport. */
   width: max-content;
+  min-width: 21rem;
   max-width: calc(100vw - 2rem);
   box-sizing: border-box;
   background: var(--panel-bg);
