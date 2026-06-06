@@ -4,12 +4,14 @@
 -- "which items have a note" (a lightweight id list); the content is fetched on
 -- demand when the note panel opens, and written only when edited.
 --
--- One row per item (item_id is the original TodoItem id).
+-- One row per note. item_id is a TodoItem id, OR a day id ("YYYY-MM-DD") for the
+-- single-day view's day note — so it is TEXT, not uuid (the two id spaces never
+-- collide).
 --
 -- Run this in the Supabase SQL editor after schema.sql.
 
 create table if not exists public.todo_notes (
-  item_id    uuid primary key,            -- the original TodoItem id
+  item_id    text primary key,            -- a TodoItem id, or a day id (YYYY-MM-DD)
   user_id    uuid not null references auth.users on delete cascade,
   content    text not null default '',    -- markdown / plain text
   updated_at timestamptz not null default now()
