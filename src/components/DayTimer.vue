@@ -167,9 +167,9 @@ function adjust(delta: number): void {
 }
 
 .timer__clock {
-  min-width: 4.8rem;
+  min-width: 4.2rem;
   text-align: center;
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.02em;
