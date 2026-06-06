@@ -101,16 +101,6 @@ function moveSelectedItem(dir: 'up' | 'down' | 'left' | 'right'): boolean {
 
 // Global in-app shortcut: Cmd/Ctrl+K opens quick-capture to the Inbox.
 function onGlobalKeydown(e: KeyboardEvent): void {
-  // Esc stays available for in-app use (closing menus, leaving a focus session),
-  // but kill its browser default — in Safari a stray Esc exits fullscreen, which
-  // is jarring mid-session. Skip form fields, where Esc legitimately cancels.
-  if (e.key === 'Escape') {
-    const el = e.target as HTMLElement;
-    if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && !el.isContentEditable) {
-      e.preventDefault();
-    }
-    return;
-  }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
     openCapture();
@@ -156,12 +146,22 @@ function toggleCustom(): void {
   customOpen.value = !customOpen.value;
 }
 
+// Stop the browser's default Escape (Safari exits fullscreen on a stray Esc).
+// Capture phase + unconditional so it fires even from inside an input or when an
+// inner handler stops propagation; the app's own Esc handlers still run. Skip IME
+// composition, where Esc cancels the candidate list.
+function suppressEscDefault(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && !e.isComposing) e.preventDefault();
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onGlobalKeydown);
+  window.addEventListener('keydown', suppressEscDefault, true);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown);
+  window.removeEventListener('keydown', suppressEscDefault, true);
 });
 </script>
 
