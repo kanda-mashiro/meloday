@@ -125,13 +125,14 @@ async function loadSceneBuffer(c: AudioContext, s: Scene): Promise<AudioBuffer |
   if (cached) return cached
   try {
     const res = await fetch(s.file)
-    if (!res.ok) return null
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.arrayBuffer()
     const decoded = await c.decodeAudioData(data)
     const loopable = makeFileLoopable(c, decoded)
     bufferCache.set(s.id, loopable)
     return loopable
-  } catch {
+  } catch (err) {
+    console.warn(`[ambient] failed to load ${s.file}:`, err)
     return null
   }
 }
@@ -175,9 +176,18 @@ function stopSource(): void {
 function play(): void {
   ensureContext()
   const c = ctx as AudioContext
-  if (c.state === 'suspended') void c.resume()
   playing.value = true
-  startScene()
+  // resume() must run inside the click gesture, and we must wait for it to
+  // actually resolve before starting playback: Safari keeps a freshly-created
+  // context 'suspended', and a source started against a suspended context is
+  // silent (this was the "no sound in Safari" bug).
+  if (c.state === 'suspended') {
+    void c.resume().then(() => {
+      if (playing.value) startScene()
+    })
+  } else {
+    startScene()
+  }
 }
 
 function stop(): void {
