@@ -177,6 +177,33 @@ function selectFromEmpty(dir: 'up' | 'down'): boolean {
   return false;
 }
 
+// Delete/Backspace with a selection removes that item, then selects the next task
+// in the day (or the previous / nothing) so you can keep deleting.
+function deleteSelected(): boolean {
+  const id = selection.selectedId.value;
+  if (!id) return false;
+  const days = store.days.value;
+  let di = -1;
+  let vi = -1;
+  for (let d = 0; d < days.length; d++) {
+    const idx = visibleItems(days[d].items).findIndex((it) => it.id === id);
+    if (idx !== -1) {
+      di = d;
+      vi = idx;
+      break;
+    }
+  }
+  store.deleteItem({ id });
+  if (di === -1) {
+    selection.clear();
+    return true;
+  }
+  const after = visibleItems(store.itemsFor(days[di].id));
+  if (after.length === 0) selection.clear();
+  else selection.select(after[Math.min(vi, after.length - 1)].id);
+  return true;
+}
+
 // Global in-app shortcut: Cmd/Ctrl+K opens quick-capture to the Inbox.
 function onGlobalKeydown(e: KeyboardEvent): void {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -198,6 +225,15 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
     e.preventDefault();
     store.seekToToday();
+    return;
+  }
+  // Delete / Backspace removes the selected item (when not typing).
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    if (!selection.selectedId.value) return;
+    e.preventDefault();
+    deleteSelected();
     return;
   }
   // Directional keys — arrows or vim hjkl. Plain: move the SELECTION between tasks
