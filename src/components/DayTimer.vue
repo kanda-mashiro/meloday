@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { FOCUS_PRESETS } from '../composables/useFocusSession'
+import AmbientControls from './AmbientControls.vue'
 
 // A compact, standalone pomodoro for the whole day — it doesn't target a
 // specific task and never opens the full-screen FocusSession overlay. The
@@ -111,6 +112,8 @@ onBeforeUnmount(clearTicker)
         重置
       </button>
     </div>
+
+    <AmbientControls class="timer__amb" />
   </section>
 </template>
 
@@ -220,5 +223,11 @@ onBeforeUnmount(clearTicker)
 .timer__btn.-primary:hover {
   background: var(--amber-strong);
   color: #fff;
+}
+
+.timer__amb {
+  margin-top: 0.3rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--divider);
 }
 </style>

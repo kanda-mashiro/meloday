@@ -82,8 +82,11 @@ const progress = computed(() =>
         </div>
       </article>
 
-      <!-- RIGHT pane: day timer + free-form day note. Open by default. -->
-      <aside v-if="paneOpen" class="focus__pane">
+      <!-- RIGHT pane: day timer + free-form day note. Open by default.
+           @click.stop keeps any click inside the pane (timer buttons whose
+           v-if swaps the click target, the note editor, etc.) from bubbling to
+           the document-level click-away handler that clears the selection. -->
+      <aside v-if="paneOpen" class="focus__pane" @click.stop>
         <div class="focus__pane-bar">
           <button
             class="focus__pane-toggle"
