@@ -47,18 +47,27 @@ watch(user, (u) => {
   if (!u) passwordSkipped.value = false;
 });
 
-// Arrow keys and vim hjkl both map to a direction: h/← left, l/→ right, j/↓ down,
-// k/↑ up.
-const DIR_KEYS: Record<string, 'up' | 'down' | 'left' | 'right'> = {
-  arrowup: 'up',
-  k: 'up',
-  arrowdown: 'down',
-  j: 'down',
-  arrowleft: 'left',
-  h: 'left',
-  arrowright: 'right',
-  l: 'right',
-};
+// Resolve a direction from arrow keys or vim hjkl. Keyed on e.code (physical key)
+// so it works even with ⌥ held — on macOS ⌥+h/j/k/l would otherwise arrive as
+// ˙/∆/˚/¬ via e.key. h/← left, l/→ right, j/↓ down, k/↑ up.
+function dirFromEvent(e: KeyboardEvent): 'up' | 'down' | 'left' | 'right' | null {
+  switch (e.code) {
+    case 'ArrowUp':
+    case 'KeyK':
+      return 'up';
+    case 'ArrowDown':
+    case 'KeyJ':
+      return 'down';
+    case 'ArrowLeft':
+    case 'KeyH':
+      return 'left';
+    case 'ArrowRight':
+    case 'KeyL':
+      return 'right';
+    default:
+      return null;
+  }
+}
 
 // ⌥ + direction: move the selected board item one step. Returns false if there is
 // no selection or it isn't a day item (so the caller can fall back).
@@ -194,7 +203,7 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   // Directional keys — arrows or vim hjkl. Plain: move the SELECTION between tasks
   // (or, with nothing selected, navigate the date; Shift = a week). With ⌥ held:
   // move the selected card. Skipped while typing.
-  const dir = DIR_KEYS[e.key.toLowerCase()];
+  const dir = dirFromEvent(e);
   if (dir) {
     if (e.metaKey || e.ctrlKey) return;
     const el = e.target as HTMLElement;

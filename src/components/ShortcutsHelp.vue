@@ -28,7 +28,7 @@ const GROUPS: Group[] = [
     title: '选中条目后（单击任务选中）',
     rows: [
       { keys: ['↑↓←→', 'hjkl'], desc: '在任务 / 天之间移动选中' },
-      { keys: ['⌥ + 方向'], desc: '移动卡片：当天重排 / 跨天' },
+      { keys: ['⌥ + 方向/hjkl'], desc: '移动卡片：当天重排 / 跨天' },
       { keys: ['Esc'], desc: '取消选中' },
     ],
   },
