@@ -123,8 +123,8 @@ onBeforeUnmount(clearTicker)
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
-  padding: 1rem 1rem 1.2rem;
+  gap: 0.5rem;
+  padding: 0.8rem 1rem 0.9rem;
   border-bottom: 1px solid var(--divider);
 }
 
@@ -176,7 +176,7 @@ onBeforeUnmount(clearTicker)
 }
 
 .timer__clock {
-  font-size: 2.6rem;
+  font-size: 2rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -226,8 +226,22 @@ onBeforeUnmount(clearTicker)
 }
 
 .timer__amb {
-  margin-top: 0.3rem;
-  padding-top: 0.85rem;
+  margin-top: 0.1rem;
+  padding-top: 0.7rem;
   border-top: 1px solid var(--divider);
+}
+
+/* Tighten the embedded ambient picker so the timer block stays compact in the
+   pane (the full-screen FocusSession keeps the roomier default). */
+.timer__amb :deep(.amb) {
+  gap: 0.55rem;
+}
+
+.timer__amb :deep(.amb__scenes) {
+  gap: 0.3rem;
+}
+
+.timer__amb :deep(.amb__scene) {
+  padding: 0.28rem 0.4rem;
 }
 </style>
