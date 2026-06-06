@@ -3,7 +3,6 @@ import { ref, watch, computed, nextTick, onBeforeUnmount } from 'vue'
 import { useNotes } from '../composables/useNotes'
 import { useSelection } from '../composables/useSelection'
 import { useTodoStore } from '../composables/useTodoStore'
-import { parseLabelRich } from '../lib/time'
 import NoteEditor from './NoteEditor.vue'
 
 // The right-pane note follows the SELECTED task: pick a task on the left and its
@@ -25,18 +24,6 @@ const selectedId = computed(() => selection.selectedId.value)
 const selectedItem = computed(() =>
   selectedId.value ? store.state.items.find((i) => i.id === selectedId.value) ?? null : null,
 )
-// The selected task's plain-text title (tags/time stripped) for the panel header.
-const selectedLabel = computed(() => {
-  const item = selectedItem.value
-  if (!item) return ''
-  const text = parseLabelRich(item.label)
-    .segments.filter((s) => s.kind === 'text')
-    .map((s) => s.text)
-    .join('')
-    .trim()
-  return text || item.label
-})
-
 const statusText = computed(() => {
   switch (status.value) {
     case 'loading':
@@ -126,8 +113,6 @@ onBeforeUnmount(flushPending)
       <span class="tnote__status" :class="{ '-error': status === 'error' }">{{ statusText }}</span>
     </header>
 
-    <p v-if="selectedItem" class="tnote__task" :title="selectedLabel">{{ selectedLabel }}</p>
-
     <div v-if="!selectedItem" class="tnote__empty">选中一条任务来记笔记</div>
     <NoteEditor v-show="selectedItem" ref="editorRef" class="tnote__editor" @update="onUpdate" />
   </section>
@@ -165,17 +150,6 @@ onBeforeUnmount(flushPending)
 
 .tnote__status.-error {
   color: var(--accent);
-}
-
-.tnote__task {
-  flex: 0 0 auto;
-  margin: 0 1rem 0.5rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--main-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .tnote__empty {

@@ -1,38 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref } from 'vue'
 import type { DayList } from '../types/todo'
 import { usePreferences } from '../composables/usePreferences'
-import { useFocusSession } from '../composables/useFocusSession'
-import { useNotes } from '../composables/useNotes'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth, formatDateId } from '../lib/date'
 import TodoList from './TodoList.vue'
 import TaskNotePanel from './TaskNotePanel.vue'
 import DayTimer from './DayTimer.vue'
 
 const props = defineProps<{ day: DayList }>()
-const { prefs, exitFocus } = usePreferences()
-const focusSession = useFocusSession()
-const notes = useNotes()
+const { prefs } = usePreferences()
 
 // The workspace's right pane (note + timer) is open by default.
 const paneOpen = ref(true)
-
-// Esc leaves focus mode (back to a multi-day view). A focus session or note
-// drawer layered on top handles Esc first (and stops it), so this only fires
-// when the bare focus card is showing.
-function onFocusKey(e: KeyboardEvent): void {
-  if (
-    e.key === 'Escape' &&
-    prefs.columns === 1 &&
-    !focusSession.target.value &&
-    !notes.activeItem.value
-  ) {
-    e.preventDefault()
-    exitFocus()
-  }
-}
-onMounted(() => window.addEventListener('keydown', onFocusKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onFocusKey))
 
 const subline = computed(
   () => `${formatMonth(props.day.date)} ${formatDayOfMonth(props.day.date)}`,
@@ -160,13 +139,12 @@ const greeting = computed(() => {
 }
 
 .focus__workspace.-pane-open {
-  max-width: 1200px;
+  max-width: 1120px;
 }
 
 .focus__card {
   flex: 1 1 auto;
   min-width: 0;
-  align-self: stretch;
   padding: 1.6rem 1.75rem 2.5rem;
   background: var(--main-bg);
   border: 1px solid var(--divider);
@@ -176,12 +154,16 @@ const greeting = computed(() => {
 
 /* Right pane — the day workspace panel. */
 .focus__pane {
-  flex: 0 0 440px;
-  width: 440px;
-  align-self: stretch;
+  flex: 0 0 560px;
+  width: 560px;
+  /* Own height, decoupled from the task list; sticky so the timer + note stay in
+     view while a long list scrolls past. */
+  align-self: flex-start;
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 9rem);
   display: flex;
   flex-direction: column;
-  min-height: 60vh;
   background: var(--panel-bg);
   border: 1px solid var(--divider);
   border-radius: 12px;
@@ -331,7 +313,9 @@ const greeting = computed(() => {
   .focus__pane {
     flex: 0 0 auto;
     width: 100%;
+    height: auto;
     min-height: 0;
+    position: static;
   }
 }
 </style>
