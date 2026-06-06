@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
 import { useDayTimer } from '../composables/useDayTimer'
 import AmbientControls from './AmbientControls.vue'
 
@@ -9,28 +8,10 @@ import AmbientControls from './AmbientControls.vue'
 const { presets, presetMin, running, ready, finished, mmss, setPreset, start, pause, reset } =
   useDayTimer()
 
-// Click the clock (when idle) to type a custom length in minutes — the quick
-// pills are just shortcuts on top of the same setPreset.
-const editing = ref(false)
-const editValue = ref('')
-const clockInput = ref<HTMLInputElement | null>(null)
-
-async function beginEdit(): Promise<void> {
-  if (running.value) return
-  editValue.value = String(presetMin.value)
-  editing.value = true
-  await nextTick()
-  clockInput.value?.focus()
-  clockInput.value?.select()
-}
-function commitEdit(): void {
-  if (!editing.value) return
-  editing.value = false
-  const n = parseInt(editValue.value, 10)
-  if (Number.isFinite(n)) setPreset(Math.min(180, Math.max(1, n)))
-}
-function cancelEdit(): void {
-  editing.value = false
+// −/+ nudge the length in 5-minute steps for a quick custom duration (the pills
+// are the common shortcuts). Clamped to 5–120 minutes.
+function adjust(delta: number): void {
+  setPreset(Math.min(120, Math.max(5, presetMin.value + delta)))
 }
 </script>
 
@@ -53,29 +34,29 @@ function cancelEdit(): void {
       </button>
     </div>
 
-    <input
-      v-if="editing"
-      ref="clockInput"
-      v-model="editValue"
-      class="timer__clock-edit"
-      type="number"
-      min="1"
-      max="180"
-      inputmode="numeric"
-      aria-label="自定义时长（分钟）"
-      @blur="commitEdit"
-      @keydown.enter="commitEdit"
-      @keydown.esc.stop="cancelEdit"
-    />
-    <button
-      v-else
-      class="timer__clock"
-      :class="{ '-done': finished }"
-      type="button"
-      :disabled="running"
-      title="点击自定义时长（分钟）"
-      @click="beginEdit"
-    >{{ mmss }}</button>
+    <div class="timer__clockrow">
+      <button
+        v-if="!running"
+        class="timer__step"
+        type="button"
+        aria-label="减 5 分钟"
+        title="−5 分钟"
+        @click="adjust(-5)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M5 12h14"/></svg>
+      </button>
+      <div class="timer__clock" :class="{ '-done': finished }">{{ mmss }}</div>
+      <button
+        v-if="!running"
+        class="timer__step"
+        type="button"
+        aria-label="加 5 分钟"
+        title="+5 分钟"
+        @click="adjust(5)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
 
     <div class="timer__controls">
       <button
@@ -160,57 +141,44 @@ function cancelEdit(): void {
   opacity: 0.7;
 }
 
+.timer__clockrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.timer__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--main-border-light);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--aside-text);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.timer__step:hover {
+  color: var(--main-text);
+  border-color: var(--accent);
+}
+
 .timer__clock {
+  min-width: 4.6rem;
+  text-align: center;
   font-size: 2rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--main-text);
-  border: none;
-  background: transparent;
-  padding: 0.05rem 0.5rem;
-  border-radius: 8px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background-color 0.12s ease;
-}
-
-.timer__clock:hover:not(:disabled) {
-  background: var(--button-active-bg);
-}
-
-.timer__clock:disabled {
-  cursor: default;
 }
 
 .timer__clock.-done {
   color: var(--highlight-text);
-}
-
-/* Editing the clock: type a minute count; an accent underline marks edit mode. */
-.timer__clock-edit {
-  width: 4.5rem;
-  font-size: 2rem;
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  font-family: inherit;
-  color: var(--main-text);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid var(--accent);
-  outline: none;
-  caret-color: var(--accent);
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.timer__clock-edit::-webkit-outer-spin-button,
-.timer__clock-edit::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .timer__controls {
