@@ -9,6 +9,7 @@ import { hasTag, tagHue, priorityLevel, topPriority } from '../lib/tags'
 import { parseLabelRich } from '../lib/time'
 import TaskMoveMenu from './TaskMoveMenu.vue'
 import { useSelection } from '../composables/useSelection'
+import { useToast } from '../composables/useToast'
 
 const props = defineProps<{ item: TodoItem; focusable?: boolean }>()
 
@@ -17,6 +18,7 @@ const { activeTag, toggle: toggleTag } = useTagFilter()
 const notes = useNotes()
 const focusSession = useFocusSession()
 const selection = useSelection()
+const { showToast } = useToast()
 
 // Click a task once to select it (highlight), again to edit it — a two-step
 // like Finder, so a single stray click doesn't drop you into editing.
@@ -98,6 +100,7 @@ function cancelEdit(): void {
 
 function remove(): void {
   store.deleteItem({ id: props.item.id })
+  showToast('已删除 · ⌘Z 撤销')
 }
 
 // Right-click opens a "move to date" context menu at the cursor.

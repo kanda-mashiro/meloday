@@ -21,6 +21,7 @@ import { usePreferences } from './composables/usePreferences';
 import { useTodoStore } from './composables/useTodoStore';
 import { useSelection } from './composables/useSelection';
 import { useHelp } from './composables/useHelp';
+import { useToast } from './composables/useToast';
 import { tagHue } from './lib/tags';
 import type { TodoItem } from './types/todo';
 
@@ -33,6 +34,7 @@ const { prefs, columnOptions } = usePreferences();
 const store = useTodoStore();
 const selection = useSelection();
 const { toggleHelp } = useHelp();
+const { showToast } = useToast();
 // The single-day view is a distraction-free focus mode: hide the global header
 // and the Lists section so only the day's card shows. The bottom bar stays
 // (its column switcher is how you leave focus mode).
@@ -239,6 +241,14 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     openCapture();
     return;
   }
+  // ⌘/Ctrl+Z undoes the last delete (when not typing — leave text undo alone).
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    e.preventDefault();
+    if (store.undoDelete()) showToast('已恢复删除的条目');
+    return;
+  }
   // ? opens or closes the shortcuts help (Shift+/ on most layouts).
   if (e.key === '?') {
     const el = e.target as HTMLElement;
@@ -264,7 +274,7 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
     if (!selection.selectedId.value) return;
     e.preventDefault();
-    deleteSelected();
+    if (deleteSelected()) showToast('已删除 · ⌘Z 撤销');
     return;
   }
   // Space toggles the selected task's done state (when not typing).

@@ -38,6 +38,7 @@ const GROUPS: Group[] = [
     title: '通用',
     rows: [
       { keys: ['?'], desc: '打开 / 关闭本帮助' },
+      { keys: ['⌘', 'Z'], desc: '撤销删除' },
       { keys: ['Esc'], desc: '关闭弹层 / 退出专注' },
     ],
   },
