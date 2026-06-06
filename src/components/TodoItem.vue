@@ -7,6 +7,7 @@ import { useNotes } from '../composables/useNotes'
 import { useFocusSession } from '../composables/useFocusSession'
 import { hasTag, tagHue } from '../lib/tags'
 import { parseLabelRich } from '../lib/time'
+import TaskMoveMenu from './TaskMoveMenu.vue'
 
 const props = defineProps<{ item: TodoItem; focusable?: boolean }>()
 
@@ -85,10 +86,29 @@ function cancelEdit(): void {
 function remove(): void {
   store.deleteItem({ id: props.item.id })
 }
+
+// Right-click opens a "move to date" context menu at the cursor.
+const menu = ref<{ x: number; y: number } | null>(null)
+
+function openMenu(event: MouseEvent): void {
+  // Right-click selects the word under the cursor (the OS default, meant for
+  // targeting the native menu). We show our own menu, so drop that stray
+  // selection or it stays highlighted behind the menu.
+  window.getSelection()?.removeAllRanges()
+  menu.value = { x: event.clientX, y: event.clientY }
+}
+
+function closeMenu(): void {
+  menu.value = null
+}
 </script>
 
 <template>
-  <div class="todo-item" :class="{ '-done': item.done, '-dim': dimmed }">
+  <div
+    class="todo-item"
+    :class="{ '-done': item.done, '-dim': dimmed }"
+    @contextmenu.prevent="openMenu($event)"
+  >
     <button
       class="todo-item__check"
       type="button"
@@ -170,6 +190,16 @@ function remove(): void {
         <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
       </svg>
     </button>
+
+    <TaskMoveMenu
+      v-if="menu"
+      :item="item"
+      :x="menu.x"
+      :y="menu.y"
+      @close="closeMenu"
+      @note="openNote"
+      @focus="startFocus"
+    />
   </div>
 </template>
 

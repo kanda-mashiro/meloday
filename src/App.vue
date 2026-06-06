@@ -7,6 +7,7 @@ import PreferencesPanel from './components/PreferencesPanel.vue';
 import ArchiveView from './components/ArchiveView.vue';
 import NotePanel from './components/NotePanel.vue';
 import FocusSession from './components/FocusSession.vue';
+import Toast from './components/Toast.vue';
 import AppBottomBar from './components/AppBottomBar.vue';
 import QuickCapture from './components/QuickCapture.vue';
 import AuthGate from './components/AuthGate.vue';
@@ -84,6 +85,8 @@ onBeforeUnmount(() => {
     <NotePanel />
 
     <FocusSession />
+
+    <Toast />
 
     <div v-if="activeTag" class="app__filter">
       <span class="app__filter-text">Focusing</span>
