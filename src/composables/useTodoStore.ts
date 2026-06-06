@@ -40,7 +40,7 @@ export interface TodoStore {
   editItem(input: { id: string; label: string }): void
   moveItem(input: { id: string; listId: string; index: number }): void
   deleteItem(input: { id: string }): void
-  undoDelete(): boolean
+  undoDelete(): string | null
   addCustomList(): void
   editCustomList(input: { id: string; title: string }): void
   moveCustomList(input: { id: string; index: number }): void
@@ -61,8 +61,8 @@ function createStore(): TodoStore {
     Object.assign(state, result)
   }
 
-  // Snapshots taken before each delete, for ⌘Z undo (session-only, capped).
-  const undoStack: TodoData[] = []
+  // Snapshots taken before each delete (with the deleted id), for ⌘Z undo.
+  const undoStack: { snapshot: TodoData; id: string }[] = []
 
   const days = computed<DayList[]>(() =>
     getDayLists(state as TodoData, RANGE),
@@ -97,19 +97,19 @@ function createStore(): TodoStore {
   }
 
   function deleteItem(input: { id: string }): void {
-    undoStack.push(JSON.parse(JSON.stringify(state)) as TodoData)
+    undoStack.push({ snapshot: JSON.parse(JSON.stringify(state)) as TodoData, id: input.id })
     if (undoStack.length > 25) undoStack.shift()
     apply(deleteTodoItem(state as TodoData, input))
   }
 
-  // Undo the most recent delete (session-only). Keeps the current view (`at`).
-  function undoDelete(): boolean {
-    const prev = undoStack.pop()
-    if (!prev) return false
-    const at = (state as TodoData).at
-    apply(prev)
-    ;(state as TodoData).at = at
-    return true
+  // Undo the most recent delete (session-only); restores the snapshot (view and
+  // all) and returns the restored item's id so the caller can reselect it, or
+  // null if there's nothing to undo.
+  function undoDelete(): string | null {
+    const entry = undoStack.pop()
+    if (!entry) return null
+    apply(entry.snapshot)
+    return entry.id
   }
 
   function addCustomList(): void {

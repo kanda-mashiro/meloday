@@ -246,7 +246,11 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     const el = e.target as HTMLElement;
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
     e.preventDefault();
-    if (store.undoDelete()) showToast('已恢复删除的条目');
+    const restored = store.undoDelete();
+    if (restored) {
+      selection.select(restored);
+      showToast('已恢复删除的条目');
+    }
     return;
   }
   // ? opens or closes the shortcuts help (Shift+/ on most layouts).
