@@ -69,7 +69,7 @@ onBeforeUnmount(() => {
           <span v-if="running" class="bottom-bar__focus-dot" aria-hidden="true"></span>
           <svg v-else-if="finished" class="bottom-bar__focus-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>
         </button>
-        <div v-if="focusOpen" class="focus-pop__panel">
+        <div v-if="focusOpen" class="focus-pop__panel" @click.stop>
           <DayTimer />
         </div>
       </div>
