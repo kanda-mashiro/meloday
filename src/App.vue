@@ -17,6 +17,7 @@ import { useQuickCapture } from './composables/useQuickCapture';
 import { useAuth } from './composables/useAuth';
 import { useSync } from './composables/useSync';
 import { usePreferences } from './composables/usePreferences';
+import { useTodoStore } from './composables/useTodoStore';
 import { tagHue } from './lib/tags';
 
 const { activeTag, clear: clearTag } = useTagFilter();
@@ -25,6 +26,7 @@ const { user, ready, hasPassword, forceSetPassword } = useAuth();
 // Initialize the sync engine (watches auth, owns the per-user cache + cloud).
 useSync();
 const { prefs } = usePreferences();
+const store = useTodoStore();
 // The single-day view is a distraction-free focus mode: hide the global header
 // and the Lists section so only the day's card shows. The bottom bar stays
 // (its column switcher is how you leave focus mode).
@@ -54,6 +56,17 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
     openCapture();
+    return;
+  }
+  // ← / → move the visible date by a day (Shift = a week), mirroring the ‹ › « »
+  // nav. Skipped while typing in a field, where arrows move the caret.
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    e.preventDefault();
+    const step = e.shiftKey ? 7 : 1;
+    store.seekDays(e.key === 'ArrowLeft' ? -step : step);
     return;
   }
   // 1 / 3 / 5 / 7 switch the day-column count — but not while typing in a field
