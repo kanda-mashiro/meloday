@@ -8,6 +8,7 @@ import { useFocusSession } from '../composables/useFocusSession'
 import { hasTag, tagHue } from '../lib/tags'
 import { parseLabelRich } from '../lib/time'
 import TaskMoveMenu from './TaskMoveMenu.vue'
+import { useSelection } from '../composables/useSelection'
 
 const props = defineProps<{ item: TodoItem; focusable?: boolean }>()
 
@@ -15,6 +16,15 @@ const store = useTodoStore()
 const { activeTag, toggle: toggleTag } = useTagFilter()
 const notes = useNotes()
 const focusSession = useFocusSession()
+const selection = useSelection()
+
+// Click a task once to select it (highlight), again to edit it — a two-step
+// like Finder, so a single stray click doesn't drop you into editing.
+const selected = computed(() => selection.selectedId.value === props.item.id)
+function onLabelClick(): void {
+  if (selected.value) startEditing()
+  else selection.select(props.item.id)
+}
 
 function startFocus(): void {
   focusSession.start({ id: props.item.id, label: props.item.label })
@@ -106,7 +116,7 @@ function closeMenu(): void {
 <template>
   <div
     class="todo-item"
-    :class="{ '-done': item.done, '-dim': dimmed }"
+    :class="{ '-done': item.done, '-dim': dimmed, '-selected': selected }"
     @contextmenu.prevent="openMenu($event)"
   >
     <button
@@ -136,7 +146,7 @@ function closeMenu(): void {
       v-else
       class="todo-item__label"
       :title="item.label"
-      @click.stop="startEditing"
+      @click.stop="onLabelClick"
     ><template v-for="(seg, i) in segments" :key="i"><span
         v-if="seg.kind === 'tag'"
         class="tag-chip"
@@ -217,6 +227,21 @@ function closeMenu(): void {
 
 .todo-item.-dim {
   opacity: 0.3;
+}
+
+/* Selected (first click): highlight the row and reveal its actions; a second
+   click on the label then enters editing. */
+.todo-item.-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  border-radius: 6px;
+}
+
+.todo-item.-selected .todo-item__check,
+.todo-item.-selected .todo-item__focus,
+.todo-item.-selected .todo-item__note,
+.todo-item.-selected .todo-item__delete {
+  visibility: visible;
 }
 
 .todo-item__check {
