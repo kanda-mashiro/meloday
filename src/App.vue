@@ -22,6 +22,7 @@ import { useTodoStore } from './composables/useTodoStore';
 import { useSelection } from './composables/useSelection';
 import { useHelp } from './composables/useHelp';
 import { tagHue } from './lib/tags';
+import type { TodoItem } from './types/todo';
 
 const { activeTag, clear: clearTag } = useTagFilter();
 const { openCapture } = useQuickCapture();
@@ -59,8 +60,8 @@ const DIR_KEYS: Record<string, 'up' | 'down' | 'left' | 'right'> = {
   l: 'right',
 };
 
-// Move the selected board item one step in a direction. Returns false if there is
-// no selection or it isn't a day item (so the caller falls back to date nav).
+// ⌥ + direction: move the selected board item one step. Returns false if there is
+// no selection or it isn't a day item (so the caller can fall back).
 function moveSelectedItem(dir: 'up' | 'down' | 'left' | 'right'): boolean {
   const id = selection.selectedId.value;
   if (!id) return false;
@@ -99,6 +100,57 @@ function moveSelectedItem(dir: 'up' | 'down' | 'left' | 'right'): boolean {
   return true;
 }
 
+// A day's items in the order they render: completed sunk to the bottom, the rest
+// by manual index; hidden entirely when "show completed" is off.
+function visibleItems(items: readonly TodoItem[]): TodoItem[] {
+  const list = prefs.showCompleted ? [...items] : items.filter((i) => !i.done);
+  return list.sort((a, b) => (a.done !== b.done ? (a.done ? 1 : -1) : a.index - b.index));
+}
+
+// Plain direction: move the SELECTION between tasks. up/down = prev/next task in
+// the day; left/right = the adjacent day's task at a similar spot (board follows
+// if it scrolls off). Returns false if there's no visible selected day item.
+function navigateSelection(dir: 'up' | 'down' | 'left' | 'right'): boolean {
+  const id = selection.selectedId.value;
+  if (!id) return false;
+  const days = store.days.value;
+  let di = -1;
+  let vis: TodoItem[] = [];
+  let vi = -1;
+  for (let d = 0; d < days.length; d++) {
+    const v = visibleItems(days[d].items);
+    const idx = v.findIndex((it) => it.id === id);
+    if (idx !== -1) {
+      di = d;
+      vis = v;
+      vi = idx;
+      break;
+    }
+  }
+  if (di === -1) return false;
+  if (dir === 'up') {
+    if (vi > 0) selection.select(vis[vi - 1].id);
+    return true;
+  }
+  if (dir === 'down') {
+    if (vi < vis.length - 1) selection.select(vis[vi + 1].id);
+    return true;
+  }
+  const dd = dir === 'left' ? di - 1 : di + 1;
+  if (dd < 0 || dd >= days.length) return true;
+  const destVis = visibleItems(days[dd].items);
+  if (destVis.length === 0) return true;
+  selection.select(destVis[Math.min(vi, destVis.length - 1)].id);
+  // Follow the board if the destination day is outside the visible window.
+  const at = days.findIndex((d) => d.id === store.state.at);
+  const lead = prefs.startOn === 'yesterday' ? 1 : 0;
+  const from = Math.max(0, (at < 0 ? 0 : at) - lead);
+  if (dd < from || dd >= from + prefs.columns) {
+    store.seekDays(dir === 'left' ? -1 : 1);
+  }
+  return true;
+}
+
 // Global in-app shortcut: Cmd/Ctrl+K opens quick-capture to the Inbox.
 function onGlobalKeydown(e: KeyboardEvent): void {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -114,19 +166,23 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     toggleHelp();
     return;
   }
-  // Directional keys — arrows or vim hjkl. With a board item selected they move
-  // it: up/down reorder within the day, left/right shift it to the prev/next day
-  // (the board follows if it scrolls off). With nothing selected, left/right
-  // navigate the date (Shift = a week), like ‹ › « ». Skipped while typing.
+  // Directional keys — arrows or vim hjkl. Plain: move the SELECTION between tasks
+  // (or, with nothing selected, navigate the date; Shift = a week). With ⌥ held:
+  // move the selected card. Skipped while typing.
   const dir = DIR_KEYS[e.key.toLowerCase()];
   if (dir) {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.metaKey || e.ctrlKey) return;
     const el = e.target as HTMLElement;
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
-    if (selection.selectedId.value && moveSelectedItem(dir)) {
+    if (e.altKey) {
+      if (selection.selectedId.value && moveSelectedItem(dir)) e.preventDefault();
+      return;
+    }
+    if (selection.selectedId.value && navigateSelection(dir)) {
       e.preventDefault();
       return;
     }
+    // Nothing selected → ← / → navigate the date (Shift = a week).
     if (dir === 'left' || dir === 'right') {
       e.preventDefault();
       store.seekDays((dir === 'left' ? -1 : 1) * (e.shiftKey ? 7 : 1));
