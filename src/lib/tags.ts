@@ -11,10 +11,9 @@
 // A multi-word tag must be written in pipe form, since spaces are otherwise
 // ambiguous.
 
-// Inline tag: '#' + unicode letters/numbers, underscore or hyphen (CJK works too).
-// Internal dots are allowed so names like "llama.cpp" / "node.js" stay whole,
-// but a trailing dot (e.g. "#todo." ending a sentence) is left out.
-const TAG_RE = /#[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)*/gu
+// Inline tag: '#' + unicode letters/numbers, underscore, hyphen or dot (CJK works
+// too), so names like "llama.cpp" / "node.js" stay whole.
+const TAG_RE = /#[\p{L}\p{N}_.-]+/gu
 
 export interface LabelSegment {
   /** Display text (tags include the leading '#'). */
