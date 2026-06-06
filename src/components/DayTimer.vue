@@ -1,0 +1,224 @@
+<script setup lang="ts">
+import { ref, computed, onBeforeUnmount } from 'vue'
+import { FOCUS_PRESETS } from '../composables/useFocusSession'
+
+// A compact, standalone pomodoro for the whole day — it doesn't target a
+// specific task and never opens the full-screen FocusSession overlay. The
+// ticking logic mirrors useFocusSession's runTicker, but kept local so this
+// timer can live entirely inside the focus view's right pane.
+
+const presets = FOCUS_PRESETS
+const presetMin = ref(25)
+const remaining = ref(presetMin.value * 60) // seconds left on the clock
+const running = ref(false)
+let ticker: ReturnType<typeof setInterval> | undefined
+
+function clearTicker(): void {
+  if (ticker) {
+    clearInterval(ticker)
+    ticker = undefined
+  }
+}
+
+function runTicker(): void {
+  clearTicker()
+  running.value = true
+  ticker = setInterval(() => {
+    if (remaining.value > 0) remaining.value -= 1
+    if (remaining.value <= 0) {
+      remaining.value = 0
+      running.value = false
+      clearTicker()
+    }
+  }, 1000)
+}
+
+function setPreset(min: number): void {
+  presetMin.value = min
+  remaining.value = min * 60
+  running.value = false
+  clearTicker()
+}
+
+function start(): void {
+  if (remaining.value <= 0) remaining.value = presetMin.value * 60
+  runTicker()
+}
+
+function pause(): void {
+  running.value = false
+  clearTicker()
+}
+
+// "Complete" simply ends the session and resets the clock to the chosen length.
+function complete(): void {
+  running.value = false
+  clearTicker()
+  remaining.value = presetMin.value * 60
+}
+
+const mmss = computed(() => {
+  const m = Math.floor(remaining.value / 60)
+  const s = remaining.value % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+})
+
+const finished = computed(() => remaining.value <= 0)
+// Fresh, un-started state: full clock, not ticking.
+const ready = computed(() => !running.value && remaining.value === presetMin.value * 60)
+
+onBeforeUnmount(clearTicker)
+</script>
+
+<template>
+  <section class="timer">
+    <header class="timer__head">
+      <span class="timer__title">专注计时</span>
+    </header>
+
+    <div class="timer__presets" role="group" aria-label="时长">
+      <button
+        v-for="p in presets"
+        :key="p"
+        class="timer__preset"
+        :class="{ '-on': presetMin === p }"
+        type="button"
+        @click="setPreset(p)"
+      >
+        {{ p }}<span class="timer__preset-unit">分</span>
+      </button>
+    </div>
+
+    <div class="timer__clock" :class="{ '-done': finished }">{{ mmss }}</div>
+
+    <div class="timer__controls">
+      <button
+        v-if="!running"
+        class="timer__btn -primary"
+        type="button"
+        :title="ready ? '开始' : '继续'"
+        @click="start"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M7 5l13 7-13 7z"/></svg>
+        {{ ready ? '开始' : '继续' }}
+      </button>
+      <button v-else class="timer__btn" type="button" title="暂停" @click="pause">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+        暂停
+      </button>
+      <button class="timer__btn" type="button" title="完成" @click="complete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>
+        完成
+      </button>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.timer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1rem 1rem 1.2rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.timer__head {
+  align-self: stretch;
+}
+
+.timer__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--aside-text);
+}
+
+.timer__presets {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.timer__preset {
+  min-width: 2.9rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--main-border-light);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--aside-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.timer__preset:hover {
+  color: var(--main-text);
+}
+
+.timer__preset.-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--highlight-text);
+}
+
+.timer__preset-unit {
+  margin-left: 0.1em;
+  font-size: 0.7em;
+  opacity: 0.7;
+}
+
+.timer__clock {
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--main-text);
+}
+
+.timer__clock.-done {
+  color: var(--highlight-text);
+}
+
+.timer__controls {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.timer__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--main-border-light);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--button-text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.timer__btn:hover:not(:disabled) {
+  background: var(--button-active-bg);
+  color: var(--button-active-text);
+}
+
+.timer__btn.-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.timer__btn.-primary:hover {
+  background: var(--amber-strong);
+  color: #fff;
+}
+</style>

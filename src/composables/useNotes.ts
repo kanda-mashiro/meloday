@@ -89,9 +89,44 @@ async function saveNote(itemId: string, content: string): Promise<{ error: strin
   return { error: null }
 }
 
+// --- Day notes ---------------------------------------------------------------
+// A day's free-form note rides on the same todo_notes side-table, keyed by the
+// day id ("YYYY-MM-DD") instead of an item id — the two keyspaces never collide.
+// Day notes deliberately don't touch `noteIds` (that set only drives the
+// per-task board icon), so load/save are thin wrappers over the shared helpers.
+
+async function loadDayNote(dayId: string): Promise<{ content: string; error: string | null }> {
+  return loadNote(dayId)
+}
+
+async function saveDayNote(dayId: string, content: string): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Backend not configured' }
+  const { user } = useAuth()
+  const uid = user.value?.id
+  if (!uid) return { error: 'Not signed in' }
+
+  if (content.trim() === '') {
+    const { error } = await supabase
+      .from(NOTES_TABLE)
+      .delete()
+      .eq('item_id', dayId)
+      .eq('user_id', uid)
+    return { error: error ? error.message : null }
+  }
+
+  const { error } = await supabase.from(NOTES_TABLE).upsert({
+    item_id: dayId,
+    user_id: uid,
+    content,
+    updated_at: new Date().toISOString(),
+  })
+  return { error: error ? error.message : null }
+}
+
 /**
  * Per-item notes: a module singleton holding the open-panel target and the set
  * of items that have a note, plus lazy load/save against the todo_notes table.
+ * Also exposes parallel day-note helpers keyed by a day id.
  */
 export function useNotes(): {
   activeItem: Ref<NoteTarget | null>
@@ -100,6 +135,8 @@ export function useNotes(): {
   hasNote: (itemId: string) => boolean
   loadNote: (itemId: string) => Promise<{ content: string; error: string | null }>
   saveNote: (itemId: string, content: string) => Promise<{ error: string | null }>
+  loadDayNote: (dayId: string) => Promise<{ content: string; error: string | null }>
+  saveDayNote: (dayId: string, content: string) => Promise<{ error: string | null }>
 } {
   init()
   return {
@@ -113,5 +150,7 @@ export function useNotes(): {
     hasNote: (itemId: string) => noteIds.has(itemId),
     loadNote,
     saveNote,
+    loadDayNote,
+    saveDayNote,
   }
 }
