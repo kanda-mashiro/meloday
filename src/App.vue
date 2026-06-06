@@ -151,6 +151,23 @@ function navigateSelection(dir: 'up' | 'down' | 'left' | 'right'): boolean {
   return true;
 }
 
+// With nothing selected yet, ↑/↓ enter the list: down picks the first visible task
+// in view, up the last — scanning the visible days for the first one with items.
+function selectFromEmpty(dir: 'up' | 'down'): boolean {
+  const days = store.days.value;
+  const at = days.findIndex((d) => d.id === store.state.at);
+  const lead = prefs.startOn === 'yesterday' ? 1 : 0;
+  const from = Math.max(0, (at < 0 ? 0 : at) - lead);
+  for (let d = from; d < from + prefs.columns && d < days.length; d++) {
+    const vis = visibleItems(days[d].items);
+    if (vis.length > 0) {
+      selection.select(dir === 'down' ? vis[0].id : vis[vis.length - 1].id);
+      return true;
+    }
+  }
+  return false;
+}
+
 // Global in-app shortcut: Cmd/Ctrl+K opens quick-capture to the Inbox.
 function onGlobalKeydown(e: KeyboardEvent): void {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -190,7 +207,11 @@ function onGlobalKeydown(e: KeyboardEvent): void {
       e.preventDefault();
       return;
     }
-    // Nothing selected → ← / → navigate the date (Shift = a week).
+    // Nothing selected: ↑/↓ enter the list; ← / → navigate the date (Shift = week).
+    if (!selection.selectedId.value && (dir === 'up' || dir === 'down') && selectFromEmpty(dir)) {
+      e.preventDefault();
+      return;
+    }
     if (dir === 'left' || dir === 'right') {
       e.preventDefault();
       store.seekDays((dir === 'left' ? -1 : 1) * (e.shiftKey ? 7 : 1));
