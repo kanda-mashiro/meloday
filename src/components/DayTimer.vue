@@ -50,8 +50,8 @@ function pause(): void {
   clearTicker()
 }
 
-// "Complete" simply ends the session and resets the clock to the chosen length.
-function complete(): void {
+// Reset: stop and put the clock back to the chosen length.
+function reset(): void {
   running.value = false
   clearTicker()
   remaining.value = presetMin.value * 60
@@ -106,9 +106,9 @@ onBeforeUnmount(clearTicker)
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1em;height:1em;display:block"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
         暂停
       </button>
-      <button class="timer__btn" type="button" title="完成" @click="complete">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;display:block"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>
-        完成
+      <button v-if="!ready" class="timer__btn" type="button" title="重置" @click="reset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;display:block"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        重置
       </button>
     </div>
   </section>
