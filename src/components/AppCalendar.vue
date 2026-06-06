@@ -45,6 +45,7 @@ interface Cell {
   isSelected: boolean
   active: number
   total: number
+  done: number
 }
 
 const cells = computed<Cell[]>(() => {
@@ -67,6 +68,7 @@ const cells = computed<Cell[]>(() => {
       isSelected: id === store.state.at,
       active: c?.active ?? 0,
       total: c?.total ?? 0,
+      done: (c?.total ?? 0) - (c?.active ?? 0),
     })
   }
   return out
@@ -141,7 +143,7 @@ function jumpToday(): void {
           >
             <span class="cal__day">{{ cell.day }}</span>
             <span v-if="cell.active > 0" class="cal__count">{{ cell.active }}</span>
-            <span v-else-if="cell.total > 0" class="cal__dot" />
+            <span v-else-if="cell.done > 0" class="cal__count -done">{{ cell.done }}</span>
           </button>
         </div>
       </div>
@@ -299,12 +301,10 @@ function jumpToday(): void {
   color: var(--accent);
 }
 
-.cal__dot {
-  position: absolute;
-  bottom: 3px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--disabled-text);
+/* All tasks done that day — show the completed count, muted to set it apart
+   from the amber "still to do" badge. */
+.cal__count.-done {
+  background: var(--button-active-bg);
+  color: var(--aside-text);
 }
 </style>
