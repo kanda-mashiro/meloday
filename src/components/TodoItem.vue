@@ -449,9 +449,8 @@ function closeMenu(): void {
   visibility: visible;
 }
 
-/* Priority tags (#p0/#p1/#p2): fixed-color badges, plus a left accent strip on
-   the row for p0/p1 so urgent tasks stand out when scanning the board. p2 is a
-   quiet badge only. */
+/* Priority tags (#p0/#p1/#p2): fixed-color badges + a matching left accent strip
+   on the row, so importance reads at a glance when scanning the board. */
 .prio-badge {
   display: inline-flex;
   align-items: center;
@@ -481,12 +480,14 @@ function closeMenu(): void {
 }
 
 .todo-item.-prio-p0,
-.todo-item.-prio-p1 {
+.todo-item.-prio-p1,
+.todo-item.-prio-p2 {
   position: relative;
 }
 
 .todo-item.-prio-p0::before,
-.todo-item.-prio-p1::before {
+.todo-item.-prio-p1::before,
+.todo-item.-prio-p2::before {
   content: '';
   position: absolute;
   left: 0;
@@ -502,5 +503,9 @@ function closeMenu(): void {
 
 .todo-item.-prio-p1::before {
   background: #e07b39;
+}
+
+.todo-item.-prio-p2::before {
+  background: #6b7a90;
 }
 </style>
