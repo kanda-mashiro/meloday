@@ -21,7 +21,7 @@ function adjust(delta: number): void {
       <span class="timer__title">专注计时</span>
     </header>
 
-    <div class="timer__presets" role="group" aria-label="时长">
+    <div v-if="ready" class="timer__presets" role="group" aria-label="时长">
       <button
         v-for="p in presets"
         :key="p"
@@ -36,7 +36,7 @@ function adjust(delta: number): void {
 
     <div class="timer__clockrow">
       <button
-        v-if="!running"
+        v-if="ready"
         class="timer__step"
         type="button"
         aria-label="减 5 分钟"
@@ -47,7 +47,7 @@ function adjust(delta: number): void {
       </button>
       <div class="timer__clock" :class="{ '-done': finished }">{{ mmss }}</div>
       <button
-        v-if="!running"
+        v-if="ready"
         class="timer__step"
         type="button"
         aria-label="加 5 分钟"
