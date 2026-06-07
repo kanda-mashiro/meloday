@@ -32,7 +32,7 @@ async function submit(): Promise<void> {
   <div class="setpw">
     <div class="setpw__accent" />
     <div class="setpw__card">
-      <h1 class="setpw__brand">Melo</h1>
+      <h1 class="setpw__brand">Meloday</h1>
       <p class="setpw__tag">最后一步:给账号设置一个密码,以后可直接用密码登录。</p>
       <p class="setpw__email">{{ user?.email }}</p>
 

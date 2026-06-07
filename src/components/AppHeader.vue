@@ -6,7 +6,7 @@ const emit = defineEmits<{ preferences: []; history: []; account: [] }>()
 
 <template>
   <header class="app-header">
-    <h1 class="app-title">Melo</h1>
+    <h1 class="app-title">Meloday</h1>
 
     <nav class="app-header__side app-header__side--right">
       <AccountControl @preferences="emit('preferences')" @history="emit('history')" @account="emit('account')" />

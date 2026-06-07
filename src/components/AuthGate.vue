@@ -100,7 +100,7 @@ async function onVerify(): Promise<void> {
   <div class="gate">
     <div class="gate__accent" />
     <div class="gate__card">
-      <h1 class="gate__brand">Melo</h1>
+      <h1 class="gate__brand">Meloday</h1>
       <p class="gate__tag">Your day, in rhythm.</p>
 
       <p v-if="!isConfigured" class="gate__warn">
