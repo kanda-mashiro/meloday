@@ -31,7 +31,9 @@ const emit = defineEmits<{ preferences: []; history: [] }>()
   text-align: center;
   font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  text-transform: uppercase;
   color: var(--accent);
 }
 

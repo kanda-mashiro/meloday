@@ -101,7 +101,7 @@ async function onVerify(): Promise<void> {
     <div class="gate__accent" />
     <div class="gate__card">
       <h1 class="gate__brand">Melo</h1>
-      <p class="gate__tag">登录后开始,你的数据会自动跨设备同步。</p>
+      <p class="gate__tag">Your day, in rhythm.</p>
 
       <p v-if="!isConfigured" class="gate__warn">
         尚未配置后端。请在 <code>.env</code> 设置 <code>VITE_SUPABASE_URL</code> 和
@@ -260,7 +260,9 @@ async function onVerify(): Promise<void> {
   text-align: center;
   font-size: 1.4rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  text-transform: uppercase;
   color: var(--accent);
 }
 
