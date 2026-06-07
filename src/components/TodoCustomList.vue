@@ -3,12 +3,14 @@ import { ref, watch } from 'vue';
 import type { ResolvedCustomList } from '../types/todo';
 import { useTodoStore } from '../composables/useTodoStore';
 import { usePreferences } from '../composables/usePreferences';
+import { useImeEnter } from '../composables/useImeEnter';
 import TodoList from './TodoList.vue';
 
 const props = defineProps<{ list: ResolvedCustomList }>();
 
 const store = useTodoStore();
 const { prefs } = usePreferences();
+const { onCompositionEnd, isImeEnter } = useImeEnter();
 
 const title = ref(props.list.title);
 
@@ -21,6 +23,12 @@ watch(
 
 function commitTitle(): void {
   store.editCustomList({ id: props.list.id, title: title.value.trim() });
+}
+
+// Don't let the IME-confirming Enter (Safari) commit the rename prematurely.
+function onTitleEnter(e: KeyboardEvent): void {
+  if (isImeEnter(e)) return;
+  commitTitle();
 }
 
 function onDelete(): void {
@@ -38,7 +46,8 @@ function onDelete(): void {
         type="text"
         placeholder="Untitled"
         @blur="commitTitle"
-        @keydown.enter.prevent="commitTitle"
+        @keydown.enter.prevent="onTitleEnter"
+        @compositionend="onCompositionEnd"
       />
       <button
         class="todo-custom-list__delete"

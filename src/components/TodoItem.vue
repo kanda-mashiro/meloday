@@ -2,6 +2,7 @@
 import { computed, ref, nextTick } from 'vue'
 import type { TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
+import { useImeEnter } from '../composables/useImeEnter'
 import { useTagFilter } from '../composables/useTagFilter'
 import { useNotes } from '../composables/useNotes'
 import { useFocusSession } from '../composables/useFocusSession'
@@ -51,6 +52,7 @@ const dimmed = computed(
 const editing = ref(false)
 const draft = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
+const { onCompositionEnd, isImeEnter } = useImeEnter()
 
 function onToggle(): void {
   store.checkItem({ id: props.item.id, done: !props.item.done })
@@ -79,6 +81,12 @@ async function startEditing(): Promise<void> {
   await nextTick()
   inputEl.value?.focus()
   inputEl.value?.select()
+}
+
+// Don't let the IME-confirming Enter (Safari) commit the edit prematurely.
+function onEditEnter(e: KeyboardEvent): void {
+  if (isImeEnter(e)) return
+  commitEdit()
 }
 
 function commitEdit(): void {
@@ -145,8 +153,9 @@ function closeMenu(): void {
       class="todo-item__input"
       type="text"
       @blur="commitEdit"
-      @keydown.enter.prevent="commitEdit"
+      @keydown.enter.prevent="onEditEnter"
       @keydown.esc.prevent="cancelEdit"
+      @compositionend="onCompositionEnd"
     />
     <span
       v-else

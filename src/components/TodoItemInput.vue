@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useTodoStore } from '../composables/useTodoStore'
+import { useImeEnter } from '../composables/useImeEnter'
 import { buildLabel, tagHue, priorityLevel, topPriority } from '../lib/tags'
 
 const props = defineProps<{ listId: string }>()
@@ -57,21 +58,9 @@ function onBlur(e: FocusEvent): void {
   emit('blurEmpty')
 }
 
-// The composing-Enter is already stopped by the isComposing / keyCode 229 guard
-// in onKeydown (Chrome & Firefox fire it during composition). Safari is the
-// exception: it delivers the composition-confirming Enter as a keydown AFTER
-// compositionend, with isComposing already false — so flag the moment
-// composition ends and swallow an Enter that lands in that same tick.
-let justComposed = false
-
-function onCompositionEnd(): void {
-  justComposed = true
-  // Only the Enter that immediately follows (same task) is the IME's; clear on
-  // the next macrotask so a deliberate Enter still submits.
-  setTimeout(() => {
-    justComposed = false
-  }, 0)
-}
+// IME-aware Enter guard (see useImeEnter): swallows keys that belong to the
+// composition, including Safari's confirm-Enter that arrives after compositionend.
+const { onCompositionEnd, isImeEnter } = useImeEnter()
 
 function onKeydown(e: KeyboardEvent): void {
   // While an IME is composing, the keys belong to it (Backspace edits the
@@ -98,7 +87,7 @@ function onKeydown(e: KeyboardEvent): void {
     e.preventDefault()
     // The IME-confirming Enter that Safari delivers just after compositionend:
     // it only commits the candidate, it must not also submit the todo.
-    if (justComposed) return
+    if (isImeEnter(e)) return
     if (mode.value === 'tag') {
       sealTag()
     } else {
