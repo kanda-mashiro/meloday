@@ -35,9 +35,9 @@ export interface TodoStore {
   customLists: ComputedRef<ResolvedCustomList[]>
   inboxItems: ComputedRef<TodoItem[]>
   itemsFor(listId: string): TodoItem[]
-  addItem(input: { listId: string; label: string }): void
+  addItem(input: { listId: string; label: string; due?: string }): void
   checkItem(input: { id: string; done: boolean }): void
-  editItem(input: { id: string; label: string }): void
+  editItem(input: { id: string; label: string; due?: string }): void
   moveItem(input: { id: string; listId: string; index: number }): void
   deleteItem(input: { id: string }): void
   undoDelete(): string | null
@@ -80,7 +80,7 @@ function createStore(): TodoStore {
     return itemsForList(state as TodoData, listId)
   }
 
-  function addItem(input: { listId: string; label: string }): void {
+  function addItem(input: { listId: string; label: string; due?: string }): void {
     apply(addTodoItem(state as TodoData, input))
   }
 
@@ -88,7 +88,7 @@ function createStore(): TodoStore {
     apply(checkTodoItem(state as TodoData, input))
   }
 
-  function editItem(input: { id: string; label: string }): void {
+  function editItem(input: { id: string; label: string; due?: string }): void {
     apply(editTodoItem(state as TodoData, input))
   }
 

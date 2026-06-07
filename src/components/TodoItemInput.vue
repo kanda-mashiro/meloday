@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useImeEnter } from '../composables/useImeEnter'
 import { buildLabel, tagHue, priorityLevel, topPriority } from '../lib/tags'
+import { parseDue } from '../lib/due'
 
 const props = defineProps<{ listId: string }>()
 const emit = defineEmits<{ blurEmpty: []; captured: [] }>()
@@ -125,9 +126,13 @@ function removeTag(index: number): void {
 }
 
 function submit(): void {
-  const label = buildLabel(tags.value, text.value)
+  const raw = buildLabel(tags.value, text.value)
+  // Pull an inline !date token out of the raw label into a structured due date,
+  // the same way #tags are lifted out of the visible text.
+  const { text: label, due } = parseDue(raw)
+  // A bare "!明天" with no other text yields no label → nothing to add.
   if (!label) return
-  store.addItem({ listId: props.listId, label })
+  store.addItem({ listId: props.listId, label, due: due ?? undefined })
   tags.value = []
   text.value = ''
   mode.value = 'body'

@@ -93,7 +93,7 @@ export function getCustomTodoLists(data: TodoData): ResolvedCustomList[] {
 
 export function addTodoItem(
   data: TodoData,
-  input: { listId: string; label: string },
+  input: { listId: string; label: string; due?: string },
   now: Date = new Date()
 ): TodoData {
   const existing = data.items.filter((item) => item.listId === input.listId)
@@ -106,6 +106,8 @@ export function addTodoItem(
     label: input.label,
     done: false,
     fixed: isListInThePast(input.listId, now),
+    // Carry the optional inline deadline through; omitted when absent.
+    ...(input.due ? { due: input.due } : {}),
   }
 
   return {
@@ -137,13 +139,19 @@ export function checkTodoItem(
 
 export function editTodoItem(
   data: TodoData,
-  input: { id: string; label: string }
+  input: { id: string; label: string; due?: string }
 ): TodoData {
   return {
     ...data,
-    items: data.items.map((item) =>
-      item.id === input.id ? { ...item, label: input.label } : item
-    ),
+    items: data.items.map((item) => {
+      if (item.id !== input.id) return item
+      const next: TodoItem = { ...item, label: input.label }
+      // The editor round-trips the deadline as a !date token, so the edited text
+      // is the source of truth: set it, or drop it when the token is gone.
+      if (input.due) next.due = input.due
+      else delete next.due
+      return next
+    }),
   }
 }
 

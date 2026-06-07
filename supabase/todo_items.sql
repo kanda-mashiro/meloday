@@ -19,9 +19,13 @@ create table if not exists public.todo_items (
   done         boolean not null default false,
   fixed        boolean not null default false,  -- added to a past day → doesn't roll forward
   completed_at timestamptz,                 -- when last marked done (null when undone)
+  due          date,                        -- optional deadline (date-only); independent of list_id
   deleted_at   timestamptz,                 -- soft-delete tombstone (kept forever; never resurrect)
   updated_at   timestamptz not null default now()
 );
+
+-- If the table already exists, add the deadline column:
+--   alter table public.todo_items add column if not exists due date;
 
 -- Active board reads (a user's live items, by list).
 create index if not exists todo_items_user_list_idx

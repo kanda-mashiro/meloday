@@ -12,6 +12,8 @@ export interface TodoItem {
   completedAt?: string;
   /** Items added to a past day are "fixed" and don't roll over to today. */
   fixed: boolean;
+  /** Optional deadline (date-only, "YYYY-MM-DD"). Independent of which day list the item sits in. */
+  due?: string;
 }
 
 export interface CustomList {

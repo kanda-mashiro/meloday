@@ -23,6 +23,7 @@ interface ItemRow {
   done: boolean
   fixed: boolean
   completed_at: string | null
+  due: string | null
   deleted_at: string | null
   updated_at: string
 }
@@ -91,6 +92,7 @@ function rowToItem(r: ItemRow): TodoItem {
     done: r.done,
     completedAt: r.completed_at ?? undefined,
     fixed: r.fixed,
+    due: r.due ?? undefined,
   }
 }
 function itemToRow(it: TodoItem, uid: string, ts: number, deleted: boolean): ItemRow {
@@ -103,6 +105,7 @@ function itemToRow(it: TodoItem, uid: string, ts: number, deleted: boolean): Ite
     done: it.done,
     fixed: it.fixed,
     completed_at: it.completedAt ?? null,
+    due: it.due ?? null,
     deleted_at: deleted ? iso(ts) : null,
     updated_at: iso(ts),
   }
@@ -341,6 +344,7 @@ function init(): void {
           done: false,
           fixed: false,
           completed_at: null,
+          due: null,
           deleted_at: iso(ts),
           updated_at: iso(ts),
         })

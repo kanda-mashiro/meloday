@@ -8,6 +8,7 @@ import { useNotes } from '../composables/useNotes'
 import { useFocusSession } from '../composables/useFocusSession'
 import { hasTag, tagHue, priorityLevel, topPriority } from '../lib/tags'
 import { parseLabelRich } from '../lib/time'
+import { dueUrgency, parseDue } from '../lib/due'
 import TaskMoveMenu from './TaskMoveMenu.vue'
 import { useSelection } from '../composables/useSelection'
 import { useToast } from '../composables/useToast'
@@ -39,6 +40,25 @@ const segments = computed(() => parsed.value.segments)
 const priority = computed(() => topPriority(parsed.value.tags))
 
 const hasNote = computed(() => notes.hasNote(props.item.id))
+
+// Relative, human countdown for the due date. Re-reads "today" on each compute
+// so the meaning shifts as days pass (overdue → today → tomorrow → N days left).
+const dueLabel = computed(() => {
+  if (!props.item.due) return ''
+  const today = new Date()
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const d = new Date(props.item.due + 'T00:00:00')
+  const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const days = Math.round((d0.getTime() - t0.getTime()) / 86400000)
+  if (days < 0) return `逾期 ${-days} 天`
+  if (days === 0) return '今天截止'
+  if (days === 1) return '明天到期'
+  return `还剩 ${days} 天`
+})
+
+const dueClass = computed(() =>
+  props.item.due ? `-${dueUrgency(props.item.due)}` : '',
+)
 
 function openNote(): void {
   notes.open({ id: props.item.id, label: props.item.label })
@@ -76,7 +96,11 @@ function toEditForm(label: string): string {
 }
 
 async function startEditing(): Promise<void> {
-  draft.value = toEditForm(props.item.label)
+  // Round-trip the deadline as an editable !date token (ISO so it parses back
+  // exactly): edit it to reschedule, delete it to drop the deadline. The badge
+  // is hidden while editing so the deadline isn't shown twice.
+  const base = toEditForm(props.item.label)
+  draft.value = props.item.due ? `${base} !${props.item.due}` : base
   editing.value = true
   await nextTick()
   inputEl.value?.focus()
@@ -92,13 +116,17 @@ function onEditEnter(e: KeyboardEvent): void {
 function commitEdit(): void {
   if (!editing.value) return
   editing.value = false
-  const label = draft.value.trim()
+  // The edited text is the source of truth: pull the !date token back out, so a
+  // removed token clears the deadline and a changed one reschedules it.
+  const { text, due } = parseDue(draft.value)
+  const label = text.trim()
   if (label === '') {
     store.deleteItem({ id: props.item.id })
     return
   }
-  if (label !== props.item.label) {
-    store.editItem({ id: props.item.id, label })
+  const nextDue = due ?? undefined
+  if (label !== props.item.label || nextDue !== props.item.due) {
+    store.editItem({ id: props.item.id, label, due: nextDue })
   }
 }
 
@@ -181,6 +209,14 @@ function closeMenu(): void {
         v-else-if="seg.text.trim()"
         class="todo-item__text"
       >{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
+
+    <!-- Relative countdown badge: a quiet, human phrase whose color escalates
+         with urgency (overdue/today red, soon amber, later neutral). -->
+    <span v-if="item.due && !editing" class="todo-item__due" :class="dueClass">
+      <svg viewBox="0 0 16 16" class="todo-item__due-glyph" aria-hidden="true">
+        <circle cx="8" cy="8.5" r="5" />
+        <path d="M8 5.5v3l2 1.5" />
+      </svg>{{ dueLabel }}</span>
 
     <button
       v-if="focusable"
@@ -342,6 +378,50 @@ function closeMenu(): void {
 .todo-item.-done .tag-chip,
 .todo-item.-done .time-chip {
   opacity: 0.5;
+}
+
+/* Relative countdown badge. Small, quiet text after the label; a tiny clock
+   glyph leads it. Color escalates by urgency but stays muted, never loud. */
+.todo-item__due {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--aside-text);
+}
+
+.todo-item__due-glyph {
+  width: 0.72rem;
+  height: 0.72rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Overdue & today share the urgent red family. */
+.todo-item__due.-overdue,
+.todo-item__due.-today {
+  /* Muted red — urgent but calm; defined locally so we touch only this file. */
+  --due-overdue: #c0392b;
+  color: var(--due-overdue);
+}
+
+.todo-item__due.-soon {
+  color: var(--amber-strong);
+}
+
+.todo-item__due.-later {
+  color: var(--aside-text);
+}
+
+/* A finished task's deadline no longer matters — fade the badge back. */
+.todo-item.-done .todo-item__due {
+  opacity: 0.4;
 }
 
 .todo-item__input {
