@@ -57,6 +57,22 @@ function onBlur(e: FocusEvent): void {
   emit('blurEmpty')
 }
 
+// The composing-Enter is already stopped by the isComposing / keyCode 229 guard
+// in onKeydown (Chrome & Firefox fire it during composition). Safari is the
+// exception: it delivers the composition-confirming Enter as a keydown AFTER
+// compositionend, with isComposing already false — so flag the moment
+// composition ends and swallow an Enter that lands in that same tick.
+let justComposed = false
+
+function onCompositionEnd(): void {
+  justComposed = true
+  // Only the Enter that immediately follows (same task) is the IME's; clear on
+  // the next macrotask so a deliberate Enter still submits.
+  setTimeout(() => {
+    justComposed = false
+  }, 0)
+}
+
 function onKeydown(e: KeyboardEvent): void {
   // While an IME is composing, the keys belong to it (Backspace edits the
   // half-typed text, Enter commits a candidate, etc.). Running our shortcuts
@@ -80,6 +96,9 @@ function onKeydown(e: KeyboardEvent): void {
 
   if (e.key === 'Enter') {
     e.preventDefault()
+    // The IME-confirming Enter that Safari delivers just after compositionend:
+    // it only commits the candidate, it must not also submit the todo.
+    if (justComposed) return
     if (mode.value === 'tag') {
       sealTag()
     } else {
@@ -167,6 +186,7 @@ function submit(): void {
       data-bwignore
       data-form-type="other"
       @keydown="onKeydown"
+      @compositionend="onCompositionEnd"
       @blur="onBlur"
     />
   </div>
