@@ -91,3 +91,23 @@ export function dueUrgency(due: string, today: Date = new Date()): DueUrgency {
   if (days <= 2) return 'soon'
   return 'later'
 }
+
+// Whole-day diff from today to the due date (negative = overdue).
+function daysUntil(due: string, today: Date): number {
+  const d = new Date(due + 'T00:00:00')
+  return Math.round(
+    (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
+      new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) /
+      86400000,
+  )
+}
+
+// Relative, human phrasing of a deadline: 逾期 N 天 / 今天截止 / 明天到期 /
+// 还剩 N 天. Re-reads "today" on each call so the meaning shifts as days pass.
+export function dueRelative(due: string, today: Date = new Date()): string {
+  const days = daysUntil(due, today)
+  if (days < 0) return `逾期 ${-days} 天`
+  if (days === 0) return '今天截止'
+  if (days === 1) return '明天到期'
+  return `还剩 ${days} 天`
+}

@@ -8,7 +8,7 @@ import { useNotes } from '../composables/useNotes'
 import { useFocusSession } from '../composables/useFocusSession'
 import { hasTag, tagHue, priorityLevel, topPriority } from '../lib/tags'
 import { parseLabelRich } from '../lib/time'
-import { dueUrgency, parseDue } from '../lib/due'
+import { dueUrgency, dueRelative, parseDue } from '../lib/due'
 import TaskMoveMenu from './TaskMoveMenu.vue'
 import { useSelection } from '../composables/useSelection'
 import { useToast } from '../composables/useToast'
@@ -41,20 +41,8 @@ const priority = computed(() => topPriority(parsed.value.tags))
 
 const hasNote = computed(() => notes.hasNote(props.item.id))
 
-// Relative, human countdown for the due date. Re-reads "today" on each compute
-// so the meaning shifts as days pass (overdue → today → tomorrow → N days left).
-const dueLabel = computed(() => {
-  if (!props.item.due) return ''
-  const today = new Date()
-  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const d = new Date(props.item.due + 'T00:00:00')
-  const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  const days = Math.round((d0.getTime() - t0.getTime()) / 86400000)
-  if (days < 0) return `逾期 ${-days} 天`
-  if (days === 0) return '今天截止'
-  if (days === 1) return '明天到期'
-  return `还剩 ${days} 天`
-})
+// Relative, human countdown for the due date (see dueRelative).
+const dueLabel = computed(() => (props.item.due ? dueRelative(props.item.due) : ''))
 
 const dueClass = computed(() =>
   props.item.due ? `-${dueUrgency(props.item.due)}` : '',
