@@ -60,6 +60,7 @@ export function useAuth(): {
   forceSetPassword: Ref<boolean>
   isConfigured: boolean
   signInWithPassword: (email: string, password: string) => Promise<AuthResult>
+  signInWithOAuth: (provider: 'github' | 'apple' | 'google') => Promise<AuthResult>
   sendCode: (email: string, createUser: boolean) => Promise<AuthResult>
   verifyCode: (email: string, token: string) => Promise<AuthResult>
   markPasswordResetPending: () => void
@@ -82,6 +83,18 @@ export function useAuth(): {
         supabase.auth.updateUser({ data: { has_password: true } }).catch(() => {})
       }
       return { error: null }
+    },
+
+    // Redirect to a third-party provider; Supabase brings the session back to
+    // redirectTo, where onAuthStateChange picks it up. (Configure each provider
+    // in the Supabase dashboard first.)
+    async signInWithOAuth(provider) {
+      if (!supabase) return { error: 'Backend not configured' }
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin },
+      })
+      return error ? fail(error) : { error: null }
     },
 
     // Send a 6-digit verification code. createUser=true for signup.

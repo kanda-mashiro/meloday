@@ -2,7 +2,8 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
 
-const { isConfigured, signInWithPassword, sendCode, verifyCode, markPasswordResetPending } = useAuth()
+const { isConfigured, signInWithPassword, signInWithOAuth, sendCode, verifyCode, markPasswordResetPending } =
+  useAuth()
 
 // login: email+password · signup/reset: email→code · code: enter the 6 digits
 type View = 'login' | 'signup' | 'reset' | 'code'
@@ -44,6 +45,15 @@ async function onLogin(): Promise<void> {
   busy.value = true
   error.value = null
   const res = await signInWithPassword(email.value.trim(), password.value)
+  busy.value = false
+  if (res.error) error.value = res.error
+}
+
+async function onOAuth(provider: 'github' | 'apple' | 'google'): Promise<void> {
+  busy.value = true
+  error.value = null
+  const res = await signInWithOAuth(provider)
+  // On success the browser redirects to the provider; only errors return here.
   busy.value = false
   if (res.error) error.value = res.error
 }
@@ -198,6 +208,20 @@ async function onVerify(): Promise<void> {
             发送验证码
           </button>
         </template>
+
+        <div class="gate__or"><span>或</span></div>
+        <button class="gate__oauth" type="button" :disabled="busy" @click="onOAuth('github')">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14 0 1.55-.01 2.8-.01 3.18 0 .31.21.68.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z"/></svg>
+          使用 GitHub 继续
+        </button>
+        <button class="gate__oauth" type="button" :disabled="busy" @click="onOAuth('apple')">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 1.43c.06.86-.27 1.7-.83 2.32-.6.66-1.55 1.17-2.46 1.1-.08-.86.32-1.74.85-2.3.6-.64 1.62-1.13 2.44-1.12zM19.7 17.1c-.46 1.07-.68 1.55-1.28 2.49-.83 1.31-2 2.95-3.45 2.96-1.29.01-1.62-.84-3.37-.83-1.75.01-2.12.85-3.41.83-1.45-.02-2.56-1.5-3.4-2.81-2.34-3.67-2.59-7.98-1.14-10.27 1.03-1.63 2.65-2.58 4.17-2.58 1.55 0 2.52.85 3.8.85 1.24 0 2-.85 3.8-.85 1.35 0 2.78.74 3.8 2.01-3.34 1.83-2.8 6.6.88 8.2z"/></svg>
+          使用 Apple 继续
+        </button>
+        <button class="gate__oauth" type="button" :disabled="busy" @click="onOAuth('google')">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 11v3.2h4.5c-.2 1.16-1.4 3.4-4.5 3.4a4.6 4.6 0 0 1 0-9.2c1.43 0 2.4.6 2.95 1.13l2.01-1.94A7.6 7.6 0 0 0 12 4.4a7.6 7.6 0 1 0 0 15.2c4.39 0 7.3-3.08 7.3-7.42 0-.5-.06-.88-.13-1.18H12z"/></svg>
+          使用 Google 继续
+        </button>
       </template>
     </div>
   </div>
@@ -362,6 +386,58 @@ async function onVerify(): Promise<void> {
 
 .gate__link:not(:disabled):hover {
   color: var(--highlight-text);
+}
+
+.gate__or {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.1rem 0 0.8rem;
+  color: var(--aside-text);
+  font-size: 0.74rem;
+}
+
+.gate__or::before,
+.gate__or::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--divider);
+}
+
+.gate__oauth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--main-border-light);
+  border-radius: 8px;
+  background: var(--main-bg);
+  color: var(--main-text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.gate__oauth:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.gate__oauth:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.gate__oauth svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: block;
 }
 
 .gate__code {
