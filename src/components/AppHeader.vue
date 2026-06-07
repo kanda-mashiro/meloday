@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AccountControl from './AccountControl.vue'
 
-const emit = defineEmits<{ preferences: []; history: [] }>()
+const emit = defineEmits<{ preferences: []; history: []; account: [] }>()
 </script>
 
 <template>
@@ -9,7 +9,7 @@ const emit = defineEmits<{ preferences: []; history: [] }>()
     <h1 class="app-title">Melo</h1>
 
     <nav class="app-header__side app-header__side--right">
-      <AccountControl @preferences="emit('preferences')" @history="emit('history')" />
+      <AccountControl @preferences="emit('preferences')" @history="emit('history')" @account="emit('account')" />
     </nav>
   </header>
 </template>

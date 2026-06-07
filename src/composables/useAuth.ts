@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
-import type { User } from '@supabase/supabase-js'
+import type { User, UserIdentity } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
 const user: Ref<User | null> = ref(null)
@@ -65,6 +65,10 @@ export function useAuth(): {
   verifyCode: (email: string, token: string) => Promise<AuthResult>
   markPasswordResetPending: () => void
   setPassword: (password: string) => Promise<AuthResult>
+  getIdentities: () => Promise<UserIdentity[]>
+  linkOAuth: (provider: 'github' | 'apple' | 'google') => Promise<AuthResult>
+  unlinkOAuth: (identity: UserIdentity) => Promise<AuthResult>
+  updateEmail: (email: string) => Promise<AuthResult>
   signOut: () => Promise<void>
 } {
   return {
@@ -128,6 +132,41 @@ export function useAuth(): {
       passwordVerified.value = true
       forceSetPassword.value = false
       return { error: null }
+    },
+
+    // The account's linked sign-in identities (email + any OAuth providers).
+    async getIdentities() {
+      if (!supabase) return []
+      const { data } = await supabase.auth.getUserIdentities()
+      return data?.identities ?? []
+    },
+
+    // Connect an OAuth provider to the current account. This redirects the
+    // browser to the provider; the session returns to redirectTo where
+    // onAuthStateChange picks it up. Requires "Manual linking" enabled in the
+    // Supabase dashboard (Auth settings) — otherwise this returns an error.
+    async linkOAuth(provider) {
+      if (!supabase) return { error: 'Backend not configured' }
+      const { error } = await supabase.auth.linkIdentity({
+        provider,
+        options: { redirectTo: window.location.origin },
+      })
+      return error ? fail(error) : { error: null }
+    },
+
+    // Remove a linked OAuth identity from the account.
+    async unlinkOAuth(identity) {
+      if (!supabase) return { error: 'Backend not configured' }
+      const { error } = await supabase.auth.unlinkIdentity(identity)
+      return error ? fail(error) : { error: null }
+    },
+
+    // Change the account email. Supabase sends a confirmation to the new address;
+    // the change only takes effect once that link is followed.
+    async updateEmail(email) {
+      if (!supabase) return { error: 'Backend not configured' }
+      const { error } = await supabase.auth.updateUser({ email })
+      return error ? fail(error) : { error: null }
     },
 
     async signOut() {

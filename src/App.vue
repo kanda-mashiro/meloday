@@ -4,6 +4,7 @@ import AppHeader from './components/AppHeader.vue';
 import TodoFrameDays from './components/TodoFrameDays.vue';
 import TodoFrameCustom from './components/TodoFrameCustom.vue';
 import PreferencesPanel from './components/PreferencesPanel.vue';
+import AccountPanel from './components/AccountPanel.vue';
 import ArchiveView from './components/ArchiveView.vue';
 import NotePanel from './components/NotePanel.vue';
 import FocusSession from './components/FocusSession.vue';
@@ -38,6 +39,7 @@ const { showToast } = useToast();
 const focusMode = computed(() => prefs.columns === 1);
 const customOpen = ref(true);
 const prefsOpen = ref(false);
+const accountOpen = ref(false);
 const archiveOpen = ref(false);
 // Lets a user skip the "set a password" step for this session (code-only login).
 const passwordSkipped = ref(false);
@@ -363,9 +365,11 @@ onBeforeUnmount(() => {
   <div v-else class="app">
     <div class="app__accent" />
 
-    <AppHeader @preferences="prefsOpen = true" @history="archiveOpen = true" />
+    <AppHeader @preferences="prefsOpen = true" @history="archiveOpen = true" @account="accountOpen = true" />
 
     <PreferencesPanel :open="prefsOpen" @close="prefsOpen = false" />
+
+    <AccountPanel :open="accountOpen" @close="accountOpen = false" />
 
     <ArchiveView :open="archiveOpen" @close="archiveOpen = false" />
 
