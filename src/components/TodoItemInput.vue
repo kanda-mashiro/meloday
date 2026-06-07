@@ -14,6 +14,7 @@ const tags = ref<string[]>([])
 const text = ref('')
 const mode = ref<Mode>('body')
 const inputEl = ref<HTMLInputElement | null>(null)
+const rootEl = ref<HTMLElement | null>(null)
 
 // Highest priority among the entered tags — drives the row's left accent strip.
 const priority = computed(() => topPriority(tags.value))
@@ -40,11 +41,20 @@ function focus(): void {
 
 defineExpose({ focus })
 
-// When the field loses focus with nothing entered, let the parent dismiss it.
-function onBlur(): void {
-  if (mode.value === 'body' && text.value === '' && tags.value.length === 0) {
+// Click-away: empty → let the parent dismiss the add-row; has content → commit
+// it so a typed draft isn't silently lost. Focus moving to something inside the
+// row (e.g. a tag's × button) isn't a real blur, so ignore it.
+function onBlur(e: FocusEvent): void {
+  const next = e.relatedTarget as Node | null
+  if (next && rootEl.value?.contains(next)) return
+  if (text.value.trim() === '' && tags.value.length === 0) {
     emit('blurEmpty')
+    return
   }
+  if (mode.value === 'tag') sealTag()
+  submit()
+  // Clicked away → also close the now-empty add row.
+  emit('blurEmpty')
 }
 
 function onKeydown(e: KeyboardEvent): void {
@@ -119,6 +129,7 @@ function submit(): void {
 
 <template>
   <div
+    ref="rootEl"
     class="todo-item-input"
     :class="[{ '-tagging': mode === 'tag' }, priority ? `-prio-${priority}` : '']"
     @click="focus"
@@ -137,6 +148,7 @@ function submit(): void {
         class="todo-item-input__x"
         type="button"
         aria-label="Remove tag"
+        @mousedown.prevent
         @click.stop="removeTag(i)"
       >×</button></span>
 
