@@ -4,6 +4,9 @@ dist
 *.tsbuildinfo
 .DS_Store
 
+# Local-only working notes, not part of the repo
+docs/
+
 # Local secrets (Supabase keys) — keep .env.example tracked
 .env
 .env.*

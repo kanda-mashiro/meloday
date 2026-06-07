@@ -10,7 +10,7 @@ export type SyncStatus = 'offline' | 'idle' | 'syncing' | 'error'
 const status: Ref<SyncStatus> = ref('offline')
 const lastSyncedAt: Ref<number | null> = ref(null)
 
-const CACHE_PREFIX = 'my-todo:'
+const CACHE_PREFIX = 'meloday:'
 const PUSH_DEBOUNCE = 800
 
 // --- Row shapes (snake_case, as stored) ------------------------------------
