@@ -105,7 +105,7 @@ async function onVerify(): Promise<void> {
 
       <p v-if="!isConfigured" class="gate__warn">
         尚未配置后端。请在 <code>.env</code> 设置 <code>VITE_SUPABASE_URL</code> 和
-        <code>VITE_SUPABASE_ANON_KEY</code> 后重启。
+        <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> 后重启。
       </p>
 
       <!-- Enter the 6-digit code -->

@@ -1,13 +1,13 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
 
-export const isConfigured = Boolean(url && anonKey)
+export const isConfigured = Boolean(url && publishableKey)
 
 // Session persists in the Tauri webview's localStorage → log in once, stays in.
 export const supabase: SupabaseClient | null = isConfigured
-  ? createClient(url as string, anonKey as string, {
+  ? createClient(url as string, publishableKey as string, {
       auth: { persistSession: true, autoRefreshToken: true },
     })
   : null
