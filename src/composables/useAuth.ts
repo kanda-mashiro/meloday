@@ -60,13 +60,13 @@ export function useAuth(): {
   forceSetPassword: Ref<boolean>
   isConfigured: boolean
   signInWithPassword: (email: string, password: string) => Promise<AuthResult>
-  signInWithOAuth: (provider: 'github' | 'apple' | 'google') => Promise<AuthResult>
+  signInWithOAuth: (provider: 'github' | 'google') => Promise<AuthResult>
   sendCode: (email: string, createUser: boolean) => Promise<AuthResult>
   verifyCode: (email: string, token: string) => Promise<AuthResult>
   markPasswordResetPending: () => void
   setPassword: (password: string) => Promise<AuthResult>
   getIdentities: () => Promise<UserIdentity[]>
-  linkOAuth: (provider: 'github' | 'apple' | 'google') => Promise<AuthResult>
+  linkOAuth: (provider: 'github' | 'google') => Promise<AuthResult>
   unlinkOAuth: (identity: UserIdentity) => Promise<AuthResult>
   updateEmail: (email: string) => Promise<AuthResult>
   signOut: () => Promise<void>
