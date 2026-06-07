@@ -12,8 +12,6 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(url as string, anonKey as string)
   : null
 
-export const TODO_TABLE = 'todo_docs'
-export const ARCHIVE_TABLE = 'todo_archive'
 export const NOTES_TABLE = 'todo_notes'
 // Per-item row model (multi-device sync). See supabase/todo_items.sql.
 export const ITEMS_TABLE = 'todo_items'

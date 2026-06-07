@@ -12,9 +12,27 @@ export const supabase: SupabaseClient | null = isConfigured
     })
   : null
 
-/** Atomic server-side append to the user's Inbox (see supabase/append_inbox_item.sql). */
+/** Insert one Inbox item as its own row (per-item model; the web app picks it up
+ *  via realtime). list_id 'inbox' matches the web's INBOX_LIST_ID. */
 export async function appendInboxItem(label: string): Promise<{ error: string | null }> {
   if (!supabase) return { error: 'Backend not configured' }
-  const { error } = await supabase.rpc('append_inbox_item', { label })
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: authErr?.message ?? 'Not signed in' }
+  const now = new Date().toISOString()
+  const { error } = await supabase.from('todo_items').insert({
+    id: crypto.randomUUID(),
+    user_id: user.id,
+    list_id: 'inbox',
+    idx: Date.now(),
+    label,
+    done: false,
+    fixed: false,
+    completed_at: null,
+    deleted_at: null,
+    updated_at: now,
+  })
   return { error: error ? error.message : null }
 }

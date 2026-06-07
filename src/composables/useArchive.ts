@@ -1,14 +1,13 @@
 import { ref, type Ref } from 'vue'
-import { supabase, ARCHIVE_TABLE } from '../lib/supabase'
+import { supabase, ITEMS_TABLE } from '../lib/supabase'
 import { useAuth } from './useAuth'
 
-/** A row from todo_archive, mapped to camelCase for the UI. */
+/** A completed todo row, mapped to camelCase for the history view. */
 export interface ArchivedItem {
   id: string
   listId: string
   label: string
   completedAt: string | null
-  archivedAt: string
 }
 
 interface ArchiveRow {
@@ -16,7 +15,6 @@ interface ArchiveRow {
   list_id: string
   label: string
   completed_at: string | null
-  archived_at: string
 }
 
 const PAGE_SIZE = 50
@@ -27,7 +25,6 @@ function mapRow(r: ArchiveRow): ArchivedItem {
     listId: r.list_id,
     label: r.label,
     completedAt: r.completed_at,
-    archivedAt: r.archived_at,
   }
 }
 
@@ -67,9 +64,11 @@ export function useArchive(): {
     }
 
     let q = supabase
-      .from(ARCHIVE_TABLE)
-      .select('id, list_id, label, completed_at, archived_at')
+      .from(ITEMS_TABLE)
+      .select('id, list_id, label, completed_at')
       .eq('user_id', uid)
+      .eq('done', true)
+      .is('deleted_at', null)
       .order('completed_at', { ascending: false, nullsFirst: false })
       .range(offset, offset + PAGE_SIZE - 1)
 
