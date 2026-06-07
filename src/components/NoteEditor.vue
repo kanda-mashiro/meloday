@@ -151,7 +151,7 @@ const TOOLBAR_GROUPS: { items: { key: string; label: string; svg?: string; title
     </div>
 
     <BubbleMenu
-      v-if="editor"
+      v-if="editor && toolbar"
       :editor="editor"
       class="ne__bubble"
       :options="{ placement: 'top' }"
