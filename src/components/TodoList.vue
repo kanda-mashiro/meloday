@@ -101,6 +101,9 @@ function onChange(event: DragChangeEvent) {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  /* Always keep ~one row of clickable empty space below the items, so a full
+     column still has somewhere to click to add a new todo. */
+  padding-bottom: var(--line-h);
   cursor: text;
 }
 
