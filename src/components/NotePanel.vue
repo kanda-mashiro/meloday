@@ -134,7 +134,7 @@ function onClose(): void {
         <button class="note__close" type="button" aria-label="Close" @click="onClose">×</button>
       </header>
 
-      <NoteEditor ref="editorRef" class="note__editor" @update="onUpdate" />
+      <NoteEditor ref="editorRef" :toolbar="false" class="note__editor" @update="onUpdate" />
 
       <footer class="note__foot">
         <span class="note__status" :class="{ '-error': status === 'error' }">{{ statusText }}</span>
