@@ -162,6 +162,10 @@ function submit(): void {
       type="text"
       :placeholder="placeholder"
       autocomplete="off"
+      data-1p-ignore
+      data-lpignore="true"
+      data-bwignore
+      data-form-type="other"
       @keydown="onKeydown"
       @blur="onBlur"
     />
