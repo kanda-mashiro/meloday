@@ -1,4 +1,6 @@
-import { reactive, watch } from 'vue'
+import { reactive, watch, nextTick } from 'vue'
+import { supabase, PREFS_TABLE } from '../lib/supabase'
+import { useAuth } from './useAuth'
 
 export type SizeStep = 'S' | 'M' | 'L'
 export type StartOn = 'today' | 'yesterday'
@@ -47,7 +49,7 @@ const LINE_HEIGHT: Record<SizeStep, string> = {
   L: '3rem',
 }
 
-const STORAGE_KEY = 'my-todo-prefs'
+const STORAGE_KEY = 'meloday-prefs'
 
 function defaults(): Preferences {
   return {
@@ -115,6 +117,33 @@ function exitFocus(): void {
   prefs.columns = prevColumns
 }
 
+// --- Cloud sync ------------------------------------------------------------
+// Preferences also live in a per-user row (user_prefs) so they follow the
+// account across devices. localStorage stays the local cache (and the only
+// store when logged out). Whole-object last-write-wins: on login the cloud copy
+// wins; later edits are pushed (debounced). Dark mode is deliberately NOT
+// synced — it's environment-dependent (see useDarkMode).
+const { user } = useAuth()
+let pushTimer: ReturnType<typeof setTimeout> | null = null
+// Guards the echo: a freshly-pulled cloud copy must not be pushed straight back.
+let applyingRemote = false
+
+function pushCloud(): void {
+  const uid = user.value?.id
+  if (!supabase || !uid) return
+  supabase
+    .from(PREFS_TABLE)
+    .upsert({ user_id: uid, prefs: { ...prefs }, updated_at: new Date().toISOString() })
+    .then(undefined, () => {
+      // Best-effort; localStorage already holds the source of truth.
+    })
+}
+
+function schedulePush(): void {
+  if (pushTimer) clearTimeout(pushTimer)
+  pushTimer = setTimeout(pushCloud, 600)
+}
+
 let initialized = false
 
 function init(): void {
@@ -130,6 +159,9 @@ function init(): void {
       } catch {
         // ignore persistence errors
       }
+      // Mirror the change up to the user's cloud row (debounced) — but not when
+      // we're applying a copy we just pulled down.
+      if (!applyingRemote && user.value) schedulePush()
     },
     { deep: true },
   )
@@ -139,6 +171,28 @@ function init(): void {
     (n) => {
       if (n !== 1) prevColumns = n
     },
+  )
+
+  // On login (or session restore) pull the cloud copy and let it win. No row
+  // yet → keep whatever's local; the next edit creates it.
+  watch(
+    () => user.value?.id,
+    async (uid) => {
+      if (!supabase || !uid) return
+      const { data } = await supabase
+        .from(PREFS_TABLE)
+        .select('prefs')
+        .eq('user_id', uid)
+        .maybeSingle()
+      if (!data?.prefs) return
+      applyingRemote = true
+      Object.assign(prefs, data.prefs as Partial<Preferences>)
+      // Let the deep watch flush (apply() + localStorage) before re-enabling
+      // pushes, so the pulled copy isn't immediately echoed back up.
+      await nextTick()
+      applyingRemote = false
+    },
+    { immediate: true },
   )
 }
 

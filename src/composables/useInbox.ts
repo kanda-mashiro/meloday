@@ -1,6 +1,6 @@
 import { ref, watch, type Ref } from 'vue'
 
-const KEY = 'my-todo-inbox-open'
+const KEY = 'meloday-inbox-open'
 
 function load(): boolean {
   try {

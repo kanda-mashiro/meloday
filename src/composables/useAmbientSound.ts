@@ -35,7 +35,7 @@ function isSceneId(v: unknown): v is SceneId {
   return typeof v === 'string' && (SCENE_IDS as string[]).includes(v)
 }
 
-const STORAGE_KEY = 'my-todo-ambient'
+const STORAGE_KEY = 'meloday-ambient'
 const DEFAULT_SCENE: SceneId = 'rain'
 
 const playing = ref(false)

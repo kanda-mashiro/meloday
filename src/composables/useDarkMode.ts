@@ -1,6 +1,6 @@
 import { ref, watch, type Ref } from 'vue'
 
-const STORAGE_KEY = 'my-todo-dark'
+const STORAGE_KEY = 'meloday-dark'
 const BODY_CLASS = '-invertcolorscheme'
 
 function prefersDark(): boolean {

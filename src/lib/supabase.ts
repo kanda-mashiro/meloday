@@ -16,3 +16,5 @@ export const NOTES_TABLE = 'todo_notes'
 // Per-item row model (multi-device sync). See supabase/todo_items.sql.
 export const ITEMS_TABLE = 'todo_items'
 export const LISTS_TABLE = 'todo_lists'
+// One row per user holding the whole preferences blob. See supabase/user_prefs.sql.
+export const PREFS_TABLE = 'user_prefs'
