@@ -1,0 +1,58 @@
+name: Desktop Release
+
+# Cut a desktop build by pushing a tag, e.g.:
+#   git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
+# Produces a universal macOS .dmg and publishes it to a GitHub Release that
+# public/install.sh (served at https://melo.day/install.sh) downloads from.
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust (universal targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Install desktop deps
+        run: npm ci
+        working-directory: desktop
+
+      - name: Build & release (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # The capture frontend reads these at build time (Vite inlines them).
+          # Add them under repo Settings → Secrets and variables → Actions.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        with:
+          projectPath: desktop
+          args: --target universal-apple-darwin
+          tagName: ${{ github.ref_name }}
+          releaseName: Meloday Desktop ${{ github.ref_name }}
+          releaseBody: |
+            Install on macOS:
+            ```
+            curl -fsSL https://melo.day/install.sh | bash
+            ```
+          releaseDraft: false
+          prerelease: false
