@@ -208,7 +208,7 @@ onMounted(async () => {
 
     <!-- Login (once) -->
     <form v-else-if="!user" class="cap__login" @submit.prevent="onLogin">
-      <div class="cap__brand">MyTodo · 登录</div>
+      <div class="cap__brand">Melo · 登录</div>
       <input v-model="email" class="cap__field" type="email" placeholder="邮箱" autocomplete="email" />
       <input v-model="password" class="cap__field" type="password" placeholder="密码" autocomplete="current-password" />
       <p v-if="loginError" class="cap__error">{{ loginError }}</p>

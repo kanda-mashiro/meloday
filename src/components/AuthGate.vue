@@ -100,7 +100,7 @@ async function onVerify(): Promise<void> {
   <div class="gate">
     <div class="gate__accent" />
     <div class="gate__card">
-      <h1 class="gate__brand">MY&nbsp;TODO</h1>
+      <h1 class="gate__brand">Melo</h1>
       <p class="gate__tag">登录后开始,你的数据会自动跨设备同步。</p>
 
       <p v-if="!isConfigured" class="gate__warn">
@@ -260,9 +260,7 @@ async function onVerify(): Promise<void> {
   text-align: center;
   font-size: 1.4rem;
   font-weight: 700;
-  letter-spacing: 0.28em;
-  text-indent: 0.28em;
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
   color: var(--accent);
 }
 

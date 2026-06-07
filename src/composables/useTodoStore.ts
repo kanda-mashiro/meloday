@@ -160,7 +160,7 @@ function createStore(): TodoStore {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = 'my-todo.json'
+    anchor.download = 'melo.json'
     document.body.appendChild(anchor)
     anchor.click()
     document.body.removeChild(anchor)

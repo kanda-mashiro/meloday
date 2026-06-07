@@ -6,7 +6,7 @@ const emit = defineEmits<{ preferences: []; history: [] }>()
 
 <template>
   <header class="app-header">
-    <h1 class="app-title">MY&nbsp;TODO</h1>
+    <h1 class="app-title">Melo</h1>
 
     <nav class="app-header__side app-header__side--right">
       <AccountControl @preferences="emit('preferences')" @history="emit('history')" />
@@ -31,9 +31,7 @@ const emit = defineEmits<{ preferences: []; history: [] }>()
   text-align: center;
   font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: 0.28em;
-  text-indent: 0.28em;
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
   color: var(--accent);
 }
 
