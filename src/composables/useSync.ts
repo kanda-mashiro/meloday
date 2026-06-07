@@ -92,7 +92,9 @@ function rowToItem(r: ItemRow): TodoItem {
     done: r.done,
     completedAt: r.completed_at ?? undefined,
     fixed: r.fixed,
-    due: r.due ?? undefined,
+    // `due` is a timestamptz column but the app treats deadlines as date-only —
+    // take just the calendar day (slice "YYYY-MM-DD") off the returned ISO.
+    due: r.due ? r.due.slice(0, 10) : undefined,
   }
 }
 function itemToRow(it: TodoItem, uid: string, ts: number, deleted: boolean): ItemRow {
@@ -105,7 +107,9 @@ function itemToRow(it: TodoItem, uid: string, ts: number, deleted: boolean): Ite
     done: it.done,
     fixed: it.fixed,
     completed_at: it.completedAt ?? null,
-    due: it.due ?? null,
+    // Store the date-only deadline as explicit UTC midnight so the calendar day
+    // round-trips regardless of the DB/session timezone.
+    due: it.due ? `${it.due}T00:00:00Z` : null,
     deleted_at: deleted ? iso(ts) : null,
     updated_at: iso(ts),
   }
