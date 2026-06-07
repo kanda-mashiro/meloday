@@ -1,0 +1,13 @@
+{
+  // Cloudflare Workers "Static Assets" config: serve the Vite build (dist/) as a
+  // static site. No server code — just the SPA. `npm run build` produces dist/,
+  // then `npx wrangler deploy` uploads it.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "melo-day",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./dist",
+    // Unknown paths fall back to index.html (single-page app + clean refreshes).
+    "not_found_handling": "single-page-application"
+  }
+}
