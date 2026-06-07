@@ -37,6 +37,9 @@ const done = computed(() => props.day.items.filter((i) => i.done).length)
 const progress = computed(() =>
   total.value === 0 ? 0 : Math.round((done.value / total.value) * 100),
 )
+// Persistent "all done" state: every item checked off. The count line collapses
+// to a quiet "全部完成" mark; reverts the moment a new task is added.
+const allDone = computed(() => total.value > 0 && done.value === total.value)
 </script>
 
 <template>
@@ -52,7 +55,15 @@ const progress = computed(() =>
           <h2 class="focus__weekday">{{ weekday }}</h2>
 
           <div v-if="total > 0" class="focus__progress">
-            <span class="focus__count">{{ total }} 项 · 已完成 {{ done }}</span>
+            <!-- Count line collapses to a quiet check + 全部完成 when the day is
+                 fully done; the <Transition> lets it settle in once on enter. -->
+            <Transition name="focus-done" mode="out-in">
+              <span v-if="allDone" key="done" class="focus__done">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:0.9em;height:0.9em;display:block"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+                <span>全部完成</span>
+              </span>
+              <span v-else key="count" class="focus__count">{{ total }} 项 · 已完成 {{ done }}</span>
+            </Transition>
             <div
               class="focus__bar"
               role="progressbar"
@@ -60,7 +71,7 @@ const progress = computed(() =>
               :aria-valuemin="0"
               :aria-valuemax="total"
             >
-              <div class="focus__bar-fill" :style="{ width: progress + '%' }" />
+              <div class="focus__bar-fill" :class="{ '-full': allDone }" :style="{ width: progress + '%' }" />
             </div>
           </div>
 
@@ -264,6 +275,30 @@ const progress = computed(() =>
   color: var(--aside-text);
 }
 
+/* All-done count line: accent-tinted check + label, a touch heavier than the
+   normal count so it reads as a calm completion mark. */
+.focus__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent, var(--highlight-text));
+}
+
+/* One-time settle when entering the all-done state (no looping). */
+.focus-done-enter-active,
+.focus-done-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.focus-done-enter-from,
+.focus-done-leave-to {
+  opacity: 0;
+  transform: translateY(3px);
+}
+
 .focus__bar {
   height: 3px;
   border-radius: 999px;
@@ -275,7 +310,13 @@ const progress = computed(() =>
   height: 100%;
   border-radius: 999px;
   background: var(--accent, var(--highlight-text));
-  transition: width 0.25s ease;
+  transition: width 0.25s ease, box-shadow 0.3s ease;
+}
+
+/* Full bar in the all-done state: a very faint accent glow, kept extremely
+   subtle so the page stays quiet. */
+.focus__bar-fill.-full {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent, var(--highlight-text)) 30%, transparent);
 }
 
 .focus__list {
