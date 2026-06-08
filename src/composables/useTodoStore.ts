@@ -104,11 +104,9 @@ function createStore(): TodoStore {
     apply(deleteTodoItem(state as TodoData, input))
   }
 
-  // One-shot "整理": re-sort a day's list once. Snapshot first (reusing the
-  // delete undo stack) so ⌘Z reverts the whole reorder in a single step.
+  // One-shot "整理": re-sort a day's list once. Not undoable (it only reorders;
+  // sharing the delete undo stack made ⌘Z behave confusingly) — re-drag if needed.
   function sortList(input: { listId: string }): void {
-    undoStack.push({ snapshot: JSON.parse(JSON.stringify(state)) as TodoData, id: input.listId })
-    if (undoStack.length > 25) undoStack.shift()
     apply(sortListItems(state as TodoData, input.listId))
   }
 
