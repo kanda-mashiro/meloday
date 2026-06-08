@@ -286,9 +286,10 @@ export function sortListItems(
       (a.item.done ? 1 : 0) - (b.item.done ? 1 : 0) ||
       a.prioRank - b.prioRank ||
       a.tagRank - b.tagRank ||
-      // Sooner deadline first; equal/both-Infinity yields 0 to avoid NaN.
-      (a.dueDays === b.dueDays ? 0 : a.dueDays - b.dueDays) ||
+      // Time-of-day first (no-time items, Infinity, fall through via ||).
       a.time - b.time ||
+      // Then sooner deadline; equal/both-Infinity yields 0 to avoid NaN.
+      (a.dueDays === b.dueDays ? 0 : a.dueDays - b.dueDays) ||
       a.originalIndex - b.originalIndex,
   )
 
