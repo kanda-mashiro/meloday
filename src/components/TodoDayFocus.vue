@@ -142,7 +142,7 @@ const allDone = computed(() => total.value > 0 && done.value === total.value)
 }
 
 .focus__workspace.-pane-open {
-  max-width: 1120px;
+  max-width: 1300px;
 }
 
 .focus__card {
@@ -162,8 +162,8 @@ const allDone = computed(() => total.value > 0 && done.value === total.value)
 
 /* Right pane — the day workspace panel. */
 .focus__pane {
-  flex: 0 0 560px;
-  width: 560px;
+  flex: 0 0 700px;
+  width: 700px;
   /* Own height, decoupled from the task list; sticky so the timer + note stay in
      view while a long list scrolls past. */
   align-self: flex-start;
