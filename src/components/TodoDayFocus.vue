@@ -5,12 +5,18 @@ import { usePreferences } from '../composables/usePreferences'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth, formatDateId } from '../lib/date'
 import TodoList from './TodoList.vue'
 import TaskNotePanel from './TaskNotePanel.vue'
+import OccasionGift from './OccasionGift.vue'
+import OccasionHeadsUp from './OccasionHeadsUp.vue'
 
 const props = defineProps<{ day: DayList }>()
 const { prefs } = usePreferences()
 
 // The workspace's right pane (the day note) is open by default.
 const paneOpen = ref(true)
+
+// Reveal the gift icon only while the header is hovered (it stays put on days
+// that already have an occasion — see OccasionGift).
+const headerHover = ref(false)
 
 const subline = computed(
   () => `${formatMonth(props.day.date)} ${formatDayOfMonth(props.day.date)}`,
@@ -47,12 +53,24 @@ const allDone = computed(() => total.value > 0 && done.value === total.value)
     <div class="focus__workspace" :class="{ '-pane-open': paneOpen }">
       <!-- LEFT pane: the day's task list (unchanged TodoList). -->
       <article class="focus__card" :class="{ '-today': day.isToday, '-past': day.isPast }">
-        <header class="focus__head">
+        <header class="focus__head" @mouseenter="headerHover = true" @mouseleave="headerHover = false">
           <div class="focus__subline">
             <span class="focus__sub">{{ subline }}</span>
             <span v-if="relativeDay" class="focus__chip">{{ relativeDay }}</span>
           </div>
-          <h2 class="focus__weekday">{{ weekday }}</h2>
+          <div class="focus__title-row">
+            <h2 class="focus__weekday">{{ weekday }}</h2>
+            <!-- Gift icon + popover to manage this day's occasions, aligned with
+                 the weekday title so it reads as a header action, not a floating
+                 top-corner control. -->
+            <div class="focus__gift">
+              <OccasionGift :date="day.date" :reveal="headerHover" />
+            </div>
+          </div>
+
+          <!-- Today-only heads-up: upcoming occasions within 2 weeks, each its own
+               small accent line so the user can plan a gift todo. -->
+          <OccasionHeadsUp v-if="day.isToday" />
 
           <div v-if="total > 0" class="focus__progress">
             <!-- Count line collapses to a quiet check + 全部完成 when the day is
@@ -85,6 +103,7 @@ const allDone = computed(() => total.value > 0 && done.value === total.value)
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.05em;height:1.05em;display:block"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg>
           </button>
+
         </header>
 
         <div class="focus__list" :class="{ ruled: prefs.showLines }">
@@ -210,6 +229,36 @@ const allDone = computed(() => total.value > 0 && done.value === total.value)
   position: absolute;
   top: 0;
   right: 0;
+}
+
+/* Gift icon + its popover, pinned top-right of the header. When the pane is
+   closed the -reopen toggle occupies right:0, so shift the gift left of it. */
+.focus__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.focus__gift {
+  flex: 0 0 auto;
+}
+
+/* The gift + heads-up are shared compact components sized for the narrow
+   multi-day columns; scale them up here to suit the focus view's big header. */
+.focus__gift :deep(.occ-gift__btn) {
+  width: 2.1rem;
+  height: 2.1rem;
+  font-size: 1.5rem;
+}
+
+.focus__head :deep(.occ-headsup) {
+  margin-top: 0.55rem;
+}
+
+.focus__head :deep(.occ-headsup__row) {
+  font-size: 0.86rem;
+  gap: 0.42rem;
 }
 
 .focus__card.-past {

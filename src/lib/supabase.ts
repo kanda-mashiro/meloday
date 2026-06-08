@@ -18,3 +18,5 @@ export const ITEMS_TABLE = 'todo_items'
 export const LISTS_TABLE = 'todo_lists'
 // One row per user holding the whole preferences blob. See supabase/user_prefs.sql.
 export const PREFS_TABLE = 'user_prefs'
+// One row per user holding the whole occasions list (生日/纪念日/节日). See supabase/user_occasions.sql.
+export const OCCASIONS_TABLE = 'user_occasions'
