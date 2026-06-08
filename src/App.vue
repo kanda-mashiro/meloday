@@ -266,6 +266,14 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     if (vis.length > 0) selection.select(vis[0].id);
     return;
   }
+  // s runs the one-shot 整理 on the currently focused day (when not typing).
+  if (e.key.toLowerCase() === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    e.preventDefault();
+    store.sortList({ listId: store.state.at });
+    return;
+  }
   // Delete / Backspace removes the selected item (when not typing).
   if (e.key === 'Backspace' || e.key === 'Delete') {
     const el = e.target as HTMLElement;

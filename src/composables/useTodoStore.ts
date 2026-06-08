@@ -14,6 +14,7 @@ import {
   editTodoItem,
   moveTodoItem,
   deleteTodoItem,
+  sortListItems,
   movePastTodoItems,
   getCustomTodoLists,
   addCustomTodoList,
@@ -40,6 +41,7 @@ export interface TodoStore {
   editItem(input: { id: string; label: string; due?: string }): void
   moveItem(input: { id: string; listId: string; index: number }): void
   deleteItem(input: { id: string }): void
+  sortList(input: { listId: string }): void
   undoDelete(): string | null
   addCustomList(): void
   editCustomList(input: { id: string; title: string }): void
@@ -100,6 +102,14 @@ function createStore(): TodoStore {
     undoStack.push({ snapshot: JSON.parse(JSON.stringify(state)) as TodoData, id: input.id })
     if (undoStack.length > 25) undoStack.shift()
     apply(deleteTodoItem(state as TodoData, input))
+  }
+
+  // One-shot "整理": re-sort a day's list once. Snapshot first (reusing the
+  // delete undo stack) so ⌘Z reverts the whole reorder in a single step.
+  function sortList(input: { listId: string }): void {
+    undoStack.push({ snapshot: JSON.parse(JSON.stringify(state)) as TodoData, id: input.listId })
+    if (undoStack.length > 25) undoStack.shift()
+    apply(sortListItems(state as TodoData, input.listId))
   }
 
   // Undo the most recent delete (session-only); restores the snapshot (view and
@@ -178,6 +188,7 @@ function createStore(): TodoStore {
     editItem,
     moveItem,
     deleteItem,
+    sortList,
     undoDelete,
     addCustomList,
     editCustomList,

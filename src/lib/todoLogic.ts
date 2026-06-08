@@ -7,6 +7,9 @@ import type {
 } from '../types/todo'
 import { uuid } from './uuid'
 import { formatDateId } from './date'
+import { parseLabel, topPriority, priorityLevel } from './tags'
+import { getTime } from './time'
+import { daysUntil } from './due'
 
 /** Matches a day-list id of the form "YYYY-MM-DD". */
 const DAY_ID_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -212,6 +215,89 @@ export function deleteTodoItem(
   return {
     ...data,
     items: [...untouched, ...affected],
+  }
+}
+
+/**
+ * The first tag of a label whose `priorityLevel` is null — i.e. its primary
+ * CONTENT tag, ignoring priority tags (p0/p1/p2). '' when it has none. This is
+ * what groups items, so a "p0 #for me" item lives in the #for me group rather
+ * than a phantom "p0" group, and a bare "p0 test" item has no content group.
+ */
+function contentPrimaryTag(label: string): string {
+  for (const tag of parseLabel(label).tags) {
+    if (priorityLevel(tag) === null) return tag.toLowerCase()
+  }
+  return ''
+}
+
+/**
+ * One-shot "整理": re-sort a single list's items to de-clutter them and rewrite
+ * their `index` to 0..n-1. Pure — other lists are untouched, and the result is
+ * just a fresh manual order, so the user can still drag to reorder afterwards.
+ *
+ * ALL items are sorted by a single stable comparator, by precedence:
+ *   0. done — not-done items first, the whole completed block sinks below,
+ *   1. priority (p0 > p1 > p2 > none) — urgent work floats to the very top,
+ *   2. content primary tag grouped by ORDER OF FIRST APPEARANCE among ALL
+ *      items, so groups settle without jumping around (untagged is a group too),
+ *   3. earliest time first (timed items lead, untimed sink),
+ *   4. original index, to keep the sort stable for otherwise-equal items.
+ * The same priority → tag → time grouping applies within both the active and
+ * completed sections; done just sits below not-done as a whole.
+ */
+export function sortListItems(
+  data: TodoData,
+  listId: string,
+  now: Date = new Date()
+): TodoData {
+  // Current order is the tie-breaker AND the source of the tag-appearance ranks.
+  const current = itemsForList(data, listId)
+
+  // Rank content primary tags by first appearance among ALL items so groups
+  // don't reshuffle on re-sort.
+  const tagRankByName = new Map<string, number>()
+  for (const item of current) {
+    const tag = contentPrimaryTag(item.label)
+    if (!tagRankByName.has(tag)) tagRankByName.set(tag, tagRankByName.size)
+  }
+
+  // Priority → rank; 'none' sorts after p2.
+  const prioRank = (label: string): number => {
+    const top = topPriority(parseLabel(label).tags)
+    return top === null ? 3 : Number(top.slice(1))
+  }
+
+  const keyed = current.map((item, originalIndex) => {
+    const time = getTime(item.label)
+    return {
+      item,
+      originalIndex,
+      prioRank: prioRank(item.label),
+      tagRank: tagRankByName.get(contentPrimaryTag(item.label)) ?? 0,
+      // Whole days until the deadline; no deadline sinks to the bottom.
+      dueDays: item.due ? daysUntil(item.due, now) : Infinity,
+      time: time ? time.start : Infinity,
+    }
+  })
+
+  keyed.sort(
+    (a, b) =>
+      (a.item.done ? 1 : 0) - (b.item.done ? 1 : 0) ||
+      a.prioRank - b.prioRank ||
+      a.tagRank - b.tagRank ||
+      // Sooner deadline first; equal/both-Infinity yields 0 to avoid NaN.
+      (a.dueDays === b.dueDays ? 0 : a.dueDays - b.dueDays) ||
+      a.time - b.time ||
+      a.originalIndex - b.originalIndex,
+  )
+
+  const reindexed = setIndexes(keyed.map((k) => k.item))
+  const untouched = data.items.filter((item) => item.listId !== listId)
+
+  return {
+    ...data,
+    items: [...untouched, ...reindexed],
   }
 }
 

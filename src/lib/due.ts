@@ -78,28 +78,23 @@ export function parseDue(label: string, today: Date = new Date()): DueParse {
 
 export type DueUrgency = 'overdue' | 'today' | 'soon' | 'later'
 
-// Urgency bucket for styling, relative to today. "soon" = within 2 days.
-export function dueUrgency(due: string, today: Date = new Date()): DueUrgency {
-  const d = new Date(due + 'T00:00:00')
-  const days = Math.round(
-    (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
-      new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) /
-      86400000,
-  )
-  if (days < 0) return 'overdue'
-  if (days === 0) return 'today'
-  if (days <= 2) return 'soon'
-  return 'later'
-}
-
 // Whole-day diff from today to the due date (negative = overdue).
-function daysUntil(due: string, today: Date): number {
+export function daysUntil(due: string, today: Date = new Date()): number {
   const d = new Date(due + 'T00:00:00')
   return Math.round(
     (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
       new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) /
       86400000,
   )
+}
+
+// Urgency bucket for styling, relative to today. "soon" = within 2 days.
+export function dueUrgency(due: string, today: Date = new Date()): DueUrgency {
+  const days = daysUntil(due, today)
+  if (days < 0) return 'overdue'
+  if (days === 0) return 'today'
+  if (days <= 2) return 'soon'
+  return 'later'
 }
 
 // Relative, human phrasing of a deadline: 逾期 N 天 / 今天截止 / 明天到期 /

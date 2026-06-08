@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { DayList } from '../types/todo'
 import { usePreferences } from '../composables/usePreferences'
+import { useTodoStore } from '../composables/useTodoStore'
 import { formatDayOfWeek, formatDayOfMonth, formatMonth, formatDateId } from '../lib/date'
 import TodoList from './TodoList.vue'
 import TaskNotePanel from './TaskNotePanel.vue'
@@ -10,6 +11,7 @@ import OccasionHeadsUp from './OccasionHeadsUp.vue'
 
 const props = defineProps<{ day: DayList }>()
 const { prefs } = usePreferences()
+const store = useTodoStore()
 
 // The workspace's right pane (the day note) is open by default.
 const paneOpen = ref(true)
@@ -60,11 +62,26 @@ const allDone = computed(() => total.value > 0 && done.value === total.value)
           </div>
           <div class="focus__title-row">
             <h2 class="focus__weekday">{{ weekday }}</h2>
-            <!-- Gift icon + popover to manage this day's occasions, aligned with
-                 the weekday title so it reads as a header action, not a floating
-                 top-corner control. -->
-            <div class="focus__gift">
-              <OccasionGift :date="day.date" :reveal="headerHover" />
+            <div class="focus__actions">
+              <!-- One-shot 整理: re-sort the day once (groups by tag/priority/time).
+                   Revealed on header hover like the gift, and only when there are
+                   ≥2 items — a single item has nothing to sort. -->
+              <button
+                v-if="total >= 2 && headerHover"
+                class="focus__sort"
+                type="button"
+                title="整理"
+                aria-label="整理"
+                @click="store.sortList({ listId: day.id })"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.1rem;height:1.1rem;display:block"><path d="M5 7h14M5 12h9M5 17h4"/></svg>
+              </button>
+              <!-- Gift icon + popover to manage this day's occasions, aligned with
+                   the weekday title so it reads as a header action, not a floating
+                   top-corner control. -->
+              <div class="focus__gift">
+                <OccasionGift :date="day.date" :reveal="headerHover" />
+              </div>
             </div>
           </div>
 
@@ -238,6 +255,35 @@ const allDone = computed(() => total.value > 0 && done.value === total.value)
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+/* Header actions clustered on the right of the weekday row. */
+.focus__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+/* 整理 button — matches the gift's quiet, square, hover-tinted look (bigger in
+   the focus view to suit its large header). */
+.focus__sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--aside-text);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.focus__sort:hover {
+  background: var(--button-active-bg);
+  color: var(--main-text);
 }
 
 .focus__gift {

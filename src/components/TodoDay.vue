@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import type { DayList } from '../types/todo';
 import { formatDayOfWeek, formatDayOfMonth, formatMonth } from '../lib/date';
 import { usePreferences } from '../composables/usePreferences';
+import { useTodoStore } from '../composables/useTodoStore';
 import TodoList from './TodoList.vue';
 import OccasionGift from './OccasionGift.vue';
 import OccasionHeadsUp from './OccasionHeadsUp.vue';
@@ -10,6 +11,10 @@ import OccasionHeadsUp from './OccasionHeadsUp.vue';
 const props = defineProps<{ day: DayList }>();
 
 const { prefs } = usePreferences();
+const store = useTodoStore();
+
+// Only offer 整理 when there's something to sort (≥2 items).
+const total = computed(() => props.day.items.length);
 
 const weekday = computed(() => formatDayOfWeek(props.day.date));
 const subline = computed(
@@ -27,9 +32,23 @@ const headerHover = ref(false);
       <span class="todo-day__sub">{{ subline }}</span>
       <div class="todo-day__title-row">
         <span class="todo-day__weekday">{{ weekday }}</span>
-        <!-- Gift control on the weekday row (matches the focus view); the popover
-             escapes the narrow column via z-index. -->
-        <OccasionGift class="todo-day__gift" :date="day.date" :reveal="headerHover" />
+        <div class="todo-day__actions">
+          <!-- One-shot 整理: revealed on header hover (like the gift) and only with
+               ≥2 items. Compact to suit the narrow multi-day column. -->
+          <button
+            v-if="total >= 2 && headerHover"
+            class="todo-day__sort"
+            type="button"
+            title="整理"
+            aria-label="整理"
+            @click="store.sortList({ listId: day.id })"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:0.95rem;height:0.95rem;display:block"><path d="M5 7h14M5 12h9M5 17h4"/></svg>
+          </button>
+          <!-- Gift control on the weekday row (matches the focus view); the popover
+               escapes the narrow column via z-index. -->
+          <OccasionGift class="todo-day__gift" :date="day.date" :reveal="headerHover" />
+        </div>
       </div>
     </header>
     <!-- Today-only heads-up: sits BELOW the header so it doesn't grow the header
@@ -80,6 +99,34 @@ const headerHover = ref(false);
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
+}
+
+/* Header actions clustered on the right of the weekday row. */
+.todo-day__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+}
+
+/* 整理 button — compact, matching the gift's quiet hover-tinted look. */
+.todo-day__sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--aside-text);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.todo-day__sort:hover {
+  background: var(--button-active-bg);
+  color: var(--main-text);
 }
 
 /* Gift button — modest for the narrow column, but not tiny. */
