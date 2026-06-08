@@ -4,6 +4,10 @@ import { ref, type Ref } from 'vue'
 // Module singleton so the rows, the click-outside-to-clear, and Esc all share
 // the same state.
 const selectedId = ref<string | null>(null)
+// A one-shot request to open a specific row's inline editor. The global
+// Enter / i shortcut sets it; the matching TodoItem watches, opens its editor,
+// and clears it — so App.vue needn't reach into any row's internals.
+const editRequestId = ref<string | null>(null)
 
 let initialized = false
 function init(): void {
@@ -26,16 +30,22 @@ init()
 
 export function useSelection(): {
   selectedId: Ref<string | null>
+  editRequestId: Ref<string | null>
   select: (id: string) => void
   clear: () => void
+  requestEdit: (id: string) => void
 } {
   return {
     selectedId,
+    editRequestId,
     select: (id: string) => {
       selectedId.value = id
     },
     clear: () => {
       selectedId.value = null
+    },
+    requestEdit: (id: string) => {
+      editRequestId.value = id
     },
   }
 }

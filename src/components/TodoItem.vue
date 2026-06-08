@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useTagFilter } from '../composables/useTagFilter'
@@ -68,6 +68,18 @@ function onToggle(): void {
 function startEditing(): void {
   editing.value = true
 }
+
+// The global Enter / i shortcut requests an edit by id; the matching row opens
+// its editor and clears the one-shot request.
+watch(
+  () => selection.editRequestId.value,
+  (id) => {
+    if (id === props.item.id) {
+      selection.editRequestId.value = null
+      startEditing()
+    }
+  },
+)
 
 function remove(): void {
   store.deleteItem({ id: props.item.id })

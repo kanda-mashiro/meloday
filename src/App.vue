@@ -274,6 +274,16 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     store.sortList({ listId: store.state.at });
     return;
   }
+  // Enter or i opens the selected task's inline editor (when not typing). i
+  // mirrors vim's "enter insert"; Enter is the universal "open selected".
+  if (e.key === 'Enter' || (e.key.toLowerCase() === 'i' && !e.metaKey && !e.ctrlKey && !e.altKey)) {
+    const el = e.target as HTMLElement;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+    if (!selection.selectedId.value) return;
+    e.preventDefault();
+    selection.requestEdit(selection.selectedId.value);
+    return;
+  }
   // Delete / Backspace removes the selected item (when not typing).
   if (e.key === 'Backspace' || e.key === 'Delete') {
     const el = e.target as HTMLElement;

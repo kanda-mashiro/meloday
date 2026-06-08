@@ -28,8 +28,34 @@ const rootEl = ref<HTMLElement | null>(null)
 const editIdx = ref<number | null>(null)
 const editTagText = ref('')
 const tagEditEl = ref<HTMLElement | null>(null)
+// The chip editor is initialized HERE, the instant its element mounts — not via
+// a deferred nextTick on a shared ref. When Backspace steps between chips, the
+// old chip unmounts (ref fires null) and the new one mounts (ref fires the
+// element) in an undefined order; a nextTick that reads the shared ref could see
+// the null and bail, leaving the new chip blank and unfocused. Seeding text +
+// focus + caret right on mount, and ignoring the null unmount calls, makes it
+// robust to that ordering and to index-key reuse in the v-for.
 function setTagEditEl(el: unknown): void {
-  tagEditEl.value = (el as HTMLElement) ?? null
+  const node = (el as HTMLElement) ?? null
+  if (!node) return // unmount call — keep tagEditEl pointing at the live editor
+  tagEditEl.value = node
+  if (editIdx.value === null) return
+  // Seed the text now (safe during the patch), but defer focus + caret to the
+  // next tick — focus() called mid-patch is unreliable and silently no-ops in
+  // some browsers. Close over THIS node so we never read the shared ref (which a
+  // sibling's unmount may have just nulled).
+  node.textContent = tags.value[editIdx.value]
+  refocusing = true // focus is about to move into this chip; finalize must wait
+  void nextTick(() => {
+    node.focus()
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    range.collapse(false)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    refocusing = false
+  })
 }
 function onTagInput(e: Event): void {
   editTagText.value = (e.target as HTMLElement).textContent ?? ''
@@ -43,12 +69,21 @@ const priority = computed(() => topPriority(tags.value))
 // slip past it, so this also converts a marker that lands at the start of the
 // body — then strips it, since the marker itself isn't part of the tag.
 watch(text, (val) => {
-  if (inputMode.value === 'body' && (val[0] === '#' || val[0] === '＃')) {
-    inputMode.value = 'tag'
-    text.value = val.slice(1)
-  } else if (inputMode.value === 'body' && (val[0] === '!' || val[0] === '！')) {
+  if (inputMode.value !== 'body') return
+  if (val[0] === '#' || val[0] === '＃') {
+    // Strip the marker, then either type the tag in the main field (fresh row)
+    // or, when there's already a body, hand off to an inline chip so the body
+    // isn't swallowed into the tag name.
+    const rest = val.slice(1)
+    text.value = rest
+    if (rest === '') inputMode.value = 'tag'
+    else startNewTag()
+  } else if (val === '!' || val === '！') {
+    // Only a bare leading '!' opens date mode. With a body present, leave the
+    // '!' literal — submit()'s parseDue lifts any inline !token at save time,
+    // so it never needs to hijack the field.
     inputMode.value = 'date'
-    text.value = val.slice(1)
+    text.value = ''
   }
 })
 
@@ -75,6 +110,14 @@ function focus(): void {
   inputEl.value?.focus()
 }
 
+// Returning to the body from a chip lands the caret at the body's START — tags
+// sit at the front, so that's where editing was happening (right before the
+// existing body text), not the far end.
+function focusBodyStart(): void {
+  focus()
+  void nextTick(() => inputEl.value?.setSelectionRange(0, 0))
+}
+
 defineExpose({ focus })
 
 // Edit mode: prefill from the item and focus with the cursor at the end (not
@@ -93,33 +136,60 @@ onMounted(() => {
   }
 })
 
-// Click-away: empty → let the parent dismiss the add-row; has content → commit
-// it so a typed draft isn't silently lost. Focus moving to something inside the
-// row (e.g. a tag's × button) isn't a real blur, so ignore it.
 // Set once the editor has handed control back (Escape-cancel or a commit), so a
-// trailing blur from the unmount doesn't fire a second commit.
+// trailing focusout from the unmount doesn't fire a second commit.
 let closing = false
 
-function onBlur(e: FocusEvent): void {
-  const next = e.relatedTarget as Node | null
-  if (next && rootEl.value?.contains(next)) return
+// True while we're programmatically moving focus INTO a chip (set in
+// setTagEditEl, cleared once that focus lands). It marks the one genuinely
+// ambiguous moment in this widget: during a chip→chip hand-off the old chip is
+// already gone but the new one isn't focused yet, so focus sits transiently on
+// <body> — indistinguishable, in that instant, from a real click-away. The flag
+// names that "refocus in flight" state so finalize can wait it out instead of
+// mistaking it for leaving the row.
+let refocusing = false
+
+// The row owns several focusable parts — the body <input> and an inline chip
+// editor that comes and goes. The ONLY thing that finalizes the editor is focus
+// leaving the whole row; focus moving *between* those parts is an internal
+// hand-off. We decide on the next tick by reading document.activeElement (the
+// settled answer), and if a refocus is still in flight we wait one more tick.
+let finalizeScheduled = false
+function onRowFocusOut(): void {
+  if (finalizeScheduled) return
+  finalizeScheduled = true
+  void nextTick(finalizeIfFocusLeft)
+}
+
+function finalizeIfFocusLeft(): void {
+  finalizeScheduled = false
   if (closing) return
+  // A programmatic refocus hasn't landed yet — re-check after it does, rather
+  // than judge "left the row" while focus is mid-air.
+  if (refocusing) {
+    finalizeScheduled = true
+    void nextTick(finalizeIfFocusLeft)
+    return
+  }
+  const active = document.activeElement
+  // A chip editor that no longer holds focus commits its text — whether focus
+  // moved to the body, to another chip, or off the row entirely.
+  if (editIdx.value !== null && active !== tagEditEl.value) commitTagEdit()
+  // Focus is still inside the row → internal hand-off, nothing to finalize.
+  if (rootEl.value && active && rootEl.value.contains(active)) return
+  // Focus truly left the row: seal any in-progress tag/date draft, then commit
+  // (edit mode always commits; an empty add-row just dismisses itself).
   if (inputMode.value === 'tag') sealTag()
   else if (inputMode.value === 'date') sealDate()
-
-  // Edit mode: a real click-away commits the edit and closes the editor (even
-  // when emptied — submit() then deletes the item).
   if (props.mode === 'edit') {
     submit()
     return
   }
-
   if (text.value.trim() === '' && tags.value.length === 0 && due.value === null) {
     emit('blurEmpty')
     return
   }
   submit()
-  // Clicked away → also close the now-empty add row.
   emit('blurEmpty')
 }
 
@@ -149,11 +219,22 @@ function onKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // '#' on an empty field enters tag mode (the '#' itself isn't typed).
-  if ((e.key === '#' || e.key === '＃') && inputMode.value === 'body' && text.value === '') {
-    e.preventDefault()
-    inputMode.value = 'tag'
-    return
+  // '#' starts a tag (the '#' itself isn't typed). On an empty field it opens
+  // tag mode in the main input; with a body already present, a '#' at the very
+  // start drops a new inline chip instead (so the body stays visible). A '#'
+  // mid-body is left literal.
+  if ((e.key === '#' || e.key === '＃') && inputMode.value === 'body') {
+    if (text.value === '') {
+      e.preventDefault()
+      inputMode.value = 'tag'
+      return
+    }
+    const el = inputEl.value
+    if (el && el.selectionStart === 0 && el.selectionEnd === 0) {
+      e.preventDefault()
+      startNewTag()
+      return
+    }
   }
 
   // '!' on an empty field enters date mode (the '!' itself isn't typed),
@@ -230,24 +311,32 @@ function removeTag(index: number): void {
   focus()
 }
 
+// Add a brand-new tag while the body already has text: drop an empty editable
+// chip at the end of the tag row and focus it (reusing the inline-edit
+// machinery), so the body stays visible and put. Enter seals it; an emptied
+// chip removes itself on commit, so abandoning it leaves no trace.
+function startNewTag(): void {
+  tags.value.push('')
+  startTagEdit(tags.value.length - 1)
+}
+
 // --- in-place tag editing (the chip's text becomes editable, no separate box) -
+// Just flip state: mounting the editor element runs the seed/focus/caret in
+// setTagEditEl above, so there's no nextTick race to get wrong.
 function startTagEdit(i: number): void {
   if (i < 0 || i >= tags.value.length) return
-  editIdx.value = i
+  // Switching straight from one chip to another (e.g. clicking chip B while
+  // editing chip A) must commit A first, or its edit is silently dropped. If A
+  // was emptied, commit removes it and everything after shifts left — including
+  // our target index when it sat to A's right.
+  if (editIdx.value !== null && editIdx.value !== i) {
+    const prev = editIdx.value
+    const prevEmptied = editTagText.value.trim() === ''
+    commitTagEdit()
+    if (prevEmptied && prev < i) i -= 1
+  }
   editTagText.value = tags.value[i]
-  void nextTick(() => {
-    const el = tagEditEl.value
-    if (!el) return
-    el.textContent = tags.value[i]
-    el.focus()
-    // Caret to the end of the contenteditable text.
-    const range = document.createRange()
-    range.selectNodeContents(el)
-    range.collapse(false)
-    const sel = window.getSelection()
-    sel?.removeAllRanges()
-    sel?.addRange(range)
-  })
+  editIdx.value = i
 }
 
 // Write the inline edit back to its tag (empty → drop the tag) and exit editing.
@@ -262,44 +351,35 @@ function commitTagEdit(): void {
 }
 
 function onTagEditKeydown(e: KeyboardEvent, i: number): void {
+  // While editing a chip, every key belongs to the chip editor — keep them from
+  // bubbling to the board's global shortcuts (Backspace=delete item, Space, …).
+  // The global guard relies on isContentEditable, which is unreliable once this
+  // very key removes the chip from the DOM mid-dispatch.
+  e.stopPropagation()
   if (e.isComposing || e.keyCode === 229) return
   if (e.key === 'Enter') {
     e.preventDefault()
     if (isImeEnter(e)) return
     commitTagEdit()
-    focus() // back to the body
+    focusBodyStart() // back to the body, caret before the existing text
     return
   }
   if (e.key === 'Escape') {
     e.preventDefault()
     editIdx.value = null // cancel without writing
     editTagText.value = ''
-    focus()
+    focusBodyStart()
     return
   }
-  // Backspace on an emptied tag removes it, then steps to the previous tag, or
-  // back to the start of the body when there are no more tags.
+  // Backspace on an emptied chip removes it and returns to the body — one
+  // predictable step. (Reaching back INTO a tag is the body-start Backspace
+  // gesture; we don't auto-dive into the previous chip from here.)
   if (e.key === 'Backspace' && editTagText.value === '') {
     e.preventDefault()
     tags.value.splice(i, 1)
     editIdx.value = null
-    if (i - 1 >= 0) {
-      startTagEdit(i - 1)
-    } else {
-      focus()
-      void nextTick(() => inputEl.value?.setSelectionRange(0, 0))
-    }
+    focusBodyStart()
   }
-}
-
-// Click-away from the inline tag input: commit it; if focus left the whole row,
-// also commit/close the editor like the body's blur would. Skipped once we've
-// already committed via Enter/Escape (which clears editIdx first).
-function onTagEditBlur(e: FocusEvent): void {
-  if (editIdx.value === null) return
-  commitTagEdit()
-  const next = e.relatedTarget as Node | null
-  if (!(next && rootEl.value?.contains(next))) onBlur(e)
 }
 
 // Parse the typed date expression (e.g. "明天", "6/20") by reusing parseDue
@@ -378,6 +458,7 @@ function submit(): void {
       priority ? `-prio-${priority}` : '',
     ]"
     @click="focus"
+    @focusout="onRowFocusOut"
   >
     <!-- Sits in the checkbox slot so chips/text line up with saved items. -->
     <!-- Slot where a saved row shows its checkbox: '+' when adding, a pencil
@@ -397,6 +478,7 @@ function submit(): void {
     <template v-for="(t, i) in tags" :key="i"><span
         v-if="editIdx === i"
         class="todo-item-input__tagedit"
+        @click.stop
       ><span class="todo-item-input__tagedit-hash">#</span><span
           :ref="setTagEditEl"
           class="todo-item-input__tagedit-text"
@@ -404,13 +486,14 @@ function submit(): void {
           @input="onTagInput"
           @keydown="onTagEditKeydown($event, i)"
           @compositionend="onCompositionEnd"
-          @blur="onTagEditBlur"
         ></span></span><span
         v-else
         :class="
           priorityLevel(t) ? ['prio-badge', '-static', `-${priorityLevel(t)}`] : ['tag-chip', '-static']
         "
         :style="priorityLevel(t) ? undefined : { '--tag-h': tagHue(t) }"
+        @mousedown.prevent
+        @click.stop="startTagEdit(i)"
       >{{ priorityLevel(t) ? priorityLevel(t)?.toUpperCase() : '#' + t }}<button
           class="todo-item-input__x"
           type="button"
@@ -453,7 +536,6 @@ function submit(): void {
       data-form-type="other"
       @keydown="onKeydown"
       @compositionend="onCompositionEnd"
-      @blur="onBlur"
     />
 
     <!-- Live preview of the date being typed: an unsealed, lighter echo of what
