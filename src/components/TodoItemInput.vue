@@ -3,17 +3,18 @@ import { computed, ref, watch } from 'vue'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useImeEnter } from '../composables/useImeEnter'
 import { buildLabel, tagHue, priorityLevel, topPriority } from '../lib/tags'
-import { parseDue } from '../lib/due'
+import { parseDue, dueRelative, dueUrgency } from '../lib/due'
 
 const props = defineProps<{ listId: string }>()
 const emit = defineEmits<{ blurEmpty: []; captured: [] }>()
 
 const store = useTodoStore()
 
-type Mode = 'body' | 'tag'
+type Mode = 'body' | 'tag' | 'date'
 
 const tags = ref<string[]>([])
 const text = ref('')
+const due = ref<string | null>(null)
 const mode = ref<Mode>('body')
 const inputEl = ref<HTMLInputElement | null>(null)
 const rootEl = ref<HTMLElement | null>(null)
@@ -29,13 +30,30 @@ watch(text, (val) => {
   if (mode.value === 'body' && (val[0] === '#' || val[0] === '＃')) {
     mode.value = 'tag'
     text.value = val.slice(1)
+  } else if (mode.value === 'body' && (val[0] === '!' || val[0] === '！')) {
+    mode.value = 'date'
+    text.value = val.slice(1)
   }
 })
 
 const placeholder = computed(() => {
   if (mode.value === 'tag') return 'tag… (Enter to seal)'
+  if (mode.value === 'date') return '明天 / 周五 / 6/20…'
   return tags.value.length ? 'what to do…' : 'Add todo…'
 })
+
+// Urgency bucket for the sealed deadline chip, mirroring TodoItem's due badge.
+const dueUrgencyClass = computed(() => (due.value ? `-${dueUrgency(due.value)}` : ''))
+
+// Live preview while typing in date mode: resolve what's typed so far the same
+// way trySealDate will. Null until a full expression parses (so "3" before
+// "3天后" shows nothing — no flicker), then drives a light "→ {relative}" hint.
+const previewDue = computed(() =>
+  mode.value === 'date' ? parseDue('!' + text.value.trim()).due : null,
+)
+const previewUrgencyClass = computed(() =>
+  previewDue.value ? `-${dueUrgency(previewDue.value)}` : '',
+)
 
 function focus(): void {
   inputEl.value?.focus()
@@ -49,11 +67,12 @@ defineExpose({ focus })
 function onBlur(e: FocusEvent): void {
   const next = e.relatedTarget as Node | null
   if (next && rootEl.value?.contains(next)) return
-  if (text.value.trim() === '' && tags.value.length === 0) {
+  if (text.value.trim() === '' && tags.value.length === 0 && due.value === null) {
     emit('blurEmpty')
     return
   }
   if (mode.value === 'tag') sealTag()
+  else if (mode.value === 'date') sealDate()
   submit()
   // Clicked away → also close the now-empty add row.
   emit('blurEmpty')
@@ -72,6 +91,7 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     text.value = ''
     tags.value = []
+    due.value = null
     mode.value = 'body'
     inputEl.value?.blur()
     return
@@ -84,6 +104,26 @@ function onKeydown(e: KeyboardEvent): void {
     return
   }
 
+  // '!' on an empty field enters date mode (the '!' itself isn't typed),
+  // mirroring tag mode. Only one deadline, so skip if one is already sealed.
+  if (
+    (e.key === '!' || e.key === '！') &&
+    mode.value === 'body' &&
+    text.value === '' &&
+    due.value === null
+  ) {
+    e.preventDefault()
+    mode.value = 'date'
+    return
+  }
+
+  // Space seals a date in date mode if the typed expression parses (mirrors how
+  // Enter seals); otherwise it falls through as a normal space.
+  if (e.key === ' ' && mode.value === 'date' && trySealDate()) {
+    e.preventDefault()
+    return
+  }
+
   if (e.key === 'Enter') {
     e.preventDefault()
     // The IME-confirming Enter that Safari delivers just after compositionend:
@@ -91,6 +131,9 @@ function onKeydown(e: KeyboardEvent): void {
     if (isImeEnter(e)) return
     if (mode.value === 'tag') {
       sealTag()
+    } else if (mode.value === 'date') {
+      // Only leave date mode once a valid deadline parses; stay put on garbage.
+      trySealDate()
     } else {
       submit()
     }
@@ -100,6 +143,12 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Backspace') {
     // Leave tag mode if the in-progress tag is empty.
     if (mode.value === 'tag' && text.value === '') {
+      e.preventDefault()
+      mode.value = 'body'
+      return
+    }
+    // Leave date mode if the in-progress date is empty.
+    if (mode.value === 'date' && text.value === '') {
       e.preventDefault()
       mode.value = 'body'
       return
@@ -125,16 +174,48 @@ function removeTag(index: number): void {
   focus()
 }
 
+// Parse the typed date expression (e.g. "明天", "6/20") by reusing parseDue
+// with the '!' prefix it expects. Seals into `due` and returns to body mode on
+// success; returns false (and stays in date mode) when nothing valid parsed.
+function trySealDate(): boolean {
+  const { due: parsed } = parseDue('!' + text.value.trim())
+  if (!parsed) return false
+  due.value = parsed
+  text.value = ''
+  mode.value = 'body'
+  return true
+}
+
+// Blur seal: commit a valid date, but never block the blur — drop an
+// unparseable in-progress expression and fall back to body mode.
+function sealDate(): void {
+  trySealDate()
+  text.value = ''
+  mode.value = 'body'
+}
+
+function clearDue(): void {
+  due.value = null
+  focus()
+}
+
 function submit(): void {
+  // The deadline lives in `due` (sealed via date mode), so the label is just
+  // tags + remaining text. Still run parseDue to lift any stray inline !token a
+  // user typed mid-text, preferring an already-sealed `due` over it.
   const raw = buildLabel(tags.value, text.value)
-  // Pull an inline !date token out of the raw label into a structured due date,
-  // the same way #tags are lifted out of the visible text.
-  const { text: label, due } = parseDue(raw)
-  // A bare "!明天" with no other text yields no label → nothing to add.
-  if (!label) return
-  store.addItem({ listId: props.listId, label, due: due ?? undefined })
+  const { text: label, due: inlineDue } = parseDue(raw)
+  // Nothing to add unless there's a label — but a bare deadline with tags still
+  // counts (label comes from the tags then).
+  if (!label && due.value === null) return
+  store.addItem({
+    listId: props.listId,
+    label,
+    due: due.value ?? inlineDue ?? undefined,
+  })
   tags.value = []
   text.value = ''
+  due.value = null
   mode.value = 'body'
   emit('captured')
 }
@@ -144,7 +225,10 @@ function submit(): void {
   <div
     ref="rootEl"
     class="todo-item-input"
-    :class="[{ '-tagging': mode === 'tag' }, priority ? `-prio-${priority}` : '']"
+    :class="[
+      { '-tagging': mode === 'tag', '-dating': mode === 'date' },
+      priority ? `-prio-${priority}` : '',
+    ]"
     @click="focus"
   >
     <!-- Sits in the checkbox slot so chips/text line up with saved items. -->
@@ -165,13 +249,31 @@ function submit(): void {
         @click.stop="removeTag(i)"
       >×</button></span>
 
+    <!-- Sealed deadline chip: a quiet countdown whose color escalates with
+         urgency, mirroring the saved item's due badge. -->
+    <span
+      v-if="due"
+      class="todo-item-input__due"
+      :class="dueUrgencyClass"
+    ><svg viewBox="0 0 16 16" class="todo-item-input__due-glyph" aria-hidden="true">
+        <circle cx="8" cy="8.5" r="5" />
+        <path d="M8 5.5v3l2 1.5" />
+      </svg>{{ dueRelative(due) }}<button
+        class="todo-item-input__x"
+        type="button"
+        aria-label="Remove deadline"
+        @mousedown.prevent
+        @click.stop="clearDue"
+      >×</button></span>
+
     <span v-if="mode === 'tag'" class="todo-item-input__hash">#</span>
+    <span v-if="mode === 'date'" class="todo-item-input__bang">!</span>
 
     <input
       ref="inputEl"
       v-model="text"
       class="todo-item-input__field"
-      :class="{ '-tag': mode === 'tag' }"
+      :class="{ '-tag': mode === 'tag', '-date': mode === 'date' }"
       type="text"
       :placeholder="placeholder"
       autocomplete="off"
@@ -183,6 +285,16 @@ function submit(): void {
       @compositionend="onCompositionEnd"
       @blur="onBlur"
     />
+
+    <!-- Live preview of the date being typed: an unsealed, lighter echo of what
+         the chip will become. Sits to the right of the date-mode input; reads
+         "→ {relative}" so it's clearly a preview, not an already-committed chip. -->
+    <span
+      v-if="previewDue"
+      class="todo-item-input__preview"
+      :class="previewUrgencyClass"
+      aria-hidden="true"
+    >→ {{ dueRelative(previewDue) }}</span>
   </div>
 </template>
 
@@ -240,6 +352,16 @@ function submit(): void {
   opacity: 0.85;
 }
 
+/* Date-mode marker — mirrors the tag '#' marker, but in the urgent amber
+   family so date mode reads distinct from tag mode at a glance. */
+.todo-item-input__bang {
+  margin-right: -0.1rem;
+  color: var(--amber-strong);
+  font-size: 0.9em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
 .todo-item-input__field {
   flex: 1 1 auto;
   min-width: 4rem;
@@ -257,6 +379,11 @@ function submit(): void {
   font-weight: 600;
 }
 
+.todo-item-input__field.-date {
+  color: var(--amber-strong);
+  font-weight: 600;
+}
+
 .todo-item-input__field::placeholder {
   color: var(--disabled-text);
   font-weight: 400;
@@ -268,6 +395,67 @@ function submit(): void {
 
 .tag-chip.-static {
   cursor: default;
+}
+
+/* Sealed deadline chip — same urgency colors as the saved item's due badge. */
+.todo-item-input__due {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.todo-item-input__due-glyph {
+  width: 0.72rem;
+  height: 0.72rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.todo-item-input__due.-overdue,
+.todo-item-input__due.-today {
+  --due-overdue: #c0392b;
+  color: var(--due-overdue);
+}
+
+.todo-item-input__due.-soon {
+  color: var(--amber-strong);
+}
+
+.todo-item-input__due.-later {
+  color: var(--aside-text);
+}
+
+/* Live date-mode preview — same urgency palette as the sealed chip, but
+   deliberately quieter: no pill, lower opacity, a leading arrow. It reads as
+   "what you'll get", not as something already committed. */
+.todo-item-input__preview {
+  flex: 0 0 auto;
+  margin-left: -0.2rem;
+  font-size: 0.85em;
+  font-style: italic;
+  white-space: nowrap;
+  opacity: 0.6;
+  user-select: none;
+  pointer-events: none;
+}
+
+.todo-item-input__preview.-overdue,
+.todo-item-input__preview.-today {
+  --due-overdue: #c0392b;
+  color: var(--due-overdue);
+}
+
+.todo-item-input__preview.-soon {
+  color: var(--amber-strong);
+}
+
+.todo-item-input__preview.-later {
+  color: var(--aside-text);
 }
 
 .todo-item-input__x {
