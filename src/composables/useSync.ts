@@ -505,6 +505,16 @@ function init(): void {
     },
     { deep: true },
   )
+
+  // Focused day (at/customAt) is local-only view state — persist it to the cache
+  // on every change (no cloud push) so a reload restores the last-viewed day.
+  watch(
+    () => [store.state.at, store.state.customAt],
+    () => {
+      if (applyingRemote || !user.value) return
+      writeCache(user.value.id)
+    },
+  )
 }
 
 export function useSync(): { status: Ref<SyncStatus>; lastSyncedAt: Ref<number | null> } {
