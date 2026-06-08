@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import type { TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
-import { useImeEnter } from '../composables/useImeEnter'
 import { useTagFilter } from '../composables/useTagFilter'
 import { useNotes } from '../composables/useNotes'
 import { useFocusSession } from '../composables/useFocusSession'
-import { hasTag, tagHue, priorityLevel, topPriority } from '../lib/tags'
-import { parseLabelRich } from '../lib/time'
-import { dueUrgency, dueRelative, parseDue } from '../lib/due'
+import { hasTag, labelText, tagHue, priorityLevel, topPriority } from '../lib/tags'
+import { parseTextRich } from '../lib/time'
+import { dueUrgency, dueRelative } from '../lib/due'
 import TaskMoveMenu from './TaskMoveMenu.vue'
+import TodoItemInput from './TodoItemInput.vue'
 import { useSelection } from '../composables/useSelection'
 import { useToast } from '../composables/useToast'
 
@@ -31,13 +31,13 @@ function onLabelClick(): void {
 }
 
 function startFocus(): void {
-  focusSession.start({ id: props.item.id, label: props.item.label })
+  focusSession.start({ id: props.item.id, label: labelText(props.item) })
 }
 
-const parsed = computed(() => parseLabelRich(props.item.label))
-const segments = computed(() => parsed.value.segments)
+// Time chips + plain text from the body; tags render separately from item.tags.
+const segments = computed(() => parseTextRich(props.item.text).segments)
 // Highest priority tag on this task (p0 > p1 > p2) — drives the row accent.
-const priority = computed(() => topPriority(parsed.value.tags))
+const priority = computed(() => topPriority(props.item.tags))
 
 const hasNote = computed(() => notes.hasNote(props.item.id))
 
@@ -49,77 +49,24 @@ const dueClass = computed(() =>
 )
 
 function openNote(): void {
-  notes.open({ id: props.item.id, label: props.item.label })
+  notes.open({ id: props.item.id, label: labelText(props.item) })
 }
 
 // In "focus mode" (a tag is active), items without that tag fade back.
 const dimmed = computed(
-  () => activeTag.value !== null && !hasTag(props.item.label, activeTag.value),
+  () => activeTag.value !== null && !hasTag(props.item.tags, activeTag.value),
 )
 
 const editing = ref(false)
-const draft = ref('')
-const inputEl = ref<HTMLInputElement | null>(null)
-const { onCompositionEnd, isImeEnter } = useImeEnter()
 
 function onToggle(): void {
   store.checkItem({ id: props.item.id, done: !props.item.done })
 }
 
-// The stored label uses pipe form ("#tag | text") so multi-word tags survive.
-// When editing, drop the pipe if every tag is a single word (the common case),
-// so the separator doesn't leak into the editor; multi-word tags keep it.
-function toEditForm(label: string): string {
-  const pipe = label.indexOf('|')
-  if (pipe === -1 || !label.slice(0, pipe).includes('#')) return label
-  const names = label
-    .slice(0, pipe)
-    .split('#')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  if (names.some((n) => /\s/.test(n))) return label
-  const body = label.slice(pipe + 1).replace(/^\s+/, '')
-  const tagPart = names.map((n) => `#${n}`).join(' ')
-  return body ? `${tagPart} ${body}` : tagPart
-}
-
-async function startEditing(): Promise<void> {
-  // Round-trip the deadline as an editable !date token (ISO so it parses back
-  // exactly): edit it to reschedule, delete it to drop the deadline. The badge
-  // is hidden while editing so the deadline isn't shown twice.
-  const base = toEditForm(props.item.label)
-  draft.value = props.item.due ? `${base} !${props.item.due}` : base
+// The shared tag-aware input drives editing too (mode="edit"); it auto-focuses
+// on mount, so all we do here is flip into editing.
+function startEditing(): void {
   editing.value = true
-  await nextTick()
-  inputEl.value?.focus()
-  inputEl.value?.select()
-}
-
-// Don't let the IME-confirming Enter (Safari) commit the edit prematurely.
-function onEditEnter(e: KeyboardEvent): void {
-  if (isImeEnter(e)) return
-  commitEdit()
-}
-
-function commitEdit(): void {
-  if (!editing.value) return
-  editing.value = false
-  // The edited text is the source of truth: pull the !date token back out, so a
-  // removed token clears the deadline and a changed one reschedules it.
-  const { text, due } = parseDue(draft.value)
-  const label = text.trim()
-  if (label === '') {
-    store.deleteItem({ id: props.item.id })
-    return
-  }
-  const nextDue = due ?? undefined
-  if (label !== props.item.label || nextDue !== props.item.due) {
-    store.editItem({ id: props.item.id, label, due: nextDue })
-  }
-}
-
-function cancelEdit(): void {
-  editing.value = false
 }
 
 function remove(): void {
@@ -162,35 +109,34 @@ function closeMenu(): void {
       </svg>
     </button>
 
-    <input
+    <TodoItemInput
       v-if="editing"
-      ref="inputEl"
-      v-model="draft"
-      class="todo-item__input"
-      type="text"
-      @blur="commitEdit"
-      @keydown.enter.prevent="onEditEnter"
-      @keydown.esc.prevent="cancelEdit"
-      @compositionend="onCompositionEnd"
+      mode="edit"
+      :list-id="item.listId"
+      :edit-item="item"
+      @done="editing = false"
     />
     <span
       v-else
       class="todo-item__label"
-      :title="item.label"
+      :title="labelText(item)"
       @click.stop="onLabelClick"
-    ><template v-for="(seg, i) in segments" :key="i"><span
-        v-if="seg.kind === 'tag' && priorityLevel(seg.tag ?? '')"
-        class="prio-badge"
-        :class="[`-${priorityLevel(seg.tag ?? '')}`, { '-on': activeTag === seg.tag?.toLowerCase() }]"
-        @click.stop="seg.tag && toggleTag(seg.tag)"
-      >{{ priorityLevel(seg.tag ?? '')?.toUpperCase() }}</span><span
-        v-else-if="seg.kind === 'tag'"
-        class="tag-chip"
-        :class="{ '-on': activeTag === seg.tag?.toLowerCase() }"
-        :style="{ '--tag-h': tagHue(seg.tag ?? '') }"
-        @click.stop="seg.tag && toggleTag(seg.tag)"
-      >{{ seg.text }}</span><span
-        v-else-if="seg.kind === 'time'"
+    ><span
+        v-for="(tag, ti) in item.tags"
+        :key="`tag-${ti}`"
+      ><span
+          v-if="priorityLevel(tag)"
+          class="prio-badge"
+          :class="[`-${priorityLevel(tag)}`, { '-on': activeTag === tag.toLowerCase() }]"
+          @click.stop="toggleTag(tag)"
+        >{{ priorityLevel(tag)?.toUpperCase() }}</span><span
+          v-else
+          class="tag-chip"
+          :class="{ '-on': activeTag === tag.toLowerCase() }"
+          :style="{ '--tag-h': tagHue(tag) }"
+          @click.stop="toggleTag(tag)"
+        >{{ '#' + tag }}</span><template v-if="ti < item.tags.length - 1 || item.text"> </template></span><template v-for="(seg, i) in segments" :key="i"><span
+        v-if="seg.kind === 'time'"
         class="time-chip"
         :class="{ '-cross': seg.time?.crossMidnight }"
       >{{ seg.text }}</span><span
@@ -410,17 +356,6 @@ function closeMenu(): void {
 /* A finished task's deadline no longer matters — fade the badge back. */
 .todo-item.-done .todo-item__due {
   opacity: 0.4;
-}
-
-.todo-item__input {
-  flex: 1 1 auto;
-  min-width: 0;
-  font: inherit;
-  color: var(--main-text);
-  background: transparent;
-  border: none;
-  padding: 0;
-  outline: none;
 }
 
 .todo-item__note {

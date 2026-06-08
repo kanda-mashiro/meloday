@@ -19,7 +19,9 @@ interface ItemRow {
   user_id: string
   list_id: string
   idx: number
-  label: string
+  tags: string[]
+  // The DB column is named `body` to avoid the SQL `text` keyword.
+  body: string
   done: boolean
   fixed: boolean
   completed_at: string | null
@@ -88,7 +90,8 @@ function rowToItem(r: ItemRow): TodoItem {
     id: r.id,
     listId: r.list_id,
     index: r.idx,
-    label: r.label,
+    tags: r.tags ?? [],
+    text: r.body ?? '',
     done: r.done,
     completedAt: r.completed_at ?? undefined,
     fixed: r.fixed,
@@ -103,7 +106,8 @@ function itemToRow(it: TodoItem, uid: string, ts: number, deleted: boolean): Ite
     user_id: uid,
     list_id: it.listId,
     idx: it.index,
-    label: it.label,
+    tags: it.tags,
+    body: it.text,
     done: it.done,
     fixed: it.fixed,
     completed_at: it.completedAt ?? null,
@@ -344,7 +348,8 @@ function init(): void {
           user_id: uid,
           list_id: '',
           idx: 0,
-          label: '',
+          tags: [],
+          body: '',
           done: false,
           fixed: false,
           completed_at: null,

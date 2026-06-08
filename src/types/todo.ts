@@ -3,7 +3,10 @@ export interface TodoItem {
   /** A day list id ("YYYY-MM-DD") or a custom list id (uuid). */
   listId: string;
   index: number;
-  label: string;
+  /** Ordered tag names WITHOUT '#', case preserved as entered (e.g. ["for me","recur"]). */
+  tags: string[];
+  /** The body sentence; may contain inline time like "13:30". */
+  text: string;
   done: boolean;
   /**
    * ISO timestamp of when the item was last marked done (cleared when undone).

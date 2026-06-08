@@ -6,14 +6,16 @@ import { useAuth } from './useAuth'
 export interface ArchivedItem {
   id: string
   listId: string
-  label: string
+  tags: string[]
+  text: string
   completedAt: string | null
 }
 
 interface ArchiveRow {
   id: string
   list_id: string
-  label: string
+  tags: string[] | null
+  body: string | null
   completed_at: string | null
 }
 
@@ -23,7 +25,8 @@ function mapRow(r: ArchiveRow): ArchivedItem {
   return {
     id: r.id,
     listId: r.list_id,
-    label: r.label,
+    tags: r.tags ?? [],
+    text: r.body ?? '',
     completedAt: r.completed_at,
   }
 }
@@ -65,7 +68,7 @@ export function useArchive(): {
 
     let q = supabase
       .from(ITEMS_TABLE)
-      .select('id, list_id, label, completed_at')
+      .select('id, list_id, tags, body, completed_at')
       .eq('user_id', uid)
       .eq('done', true)
       .is('deleted_at', null)
@@ -73,7 +76,8 @@ export function useArchive(): {
       .range(offset, offset + PAGE_SIZE - 1)
 
     const term = query.value.trim()
-    if (term) q = q.ilike('label', `%${term}%`)
+    // Search the body text (tags are a jsonb array; the body is what users type).
+    if (term) q = q.ilike('body', `%${term}%`)
 
     const { data, error: err } = await q
     loading.value = false

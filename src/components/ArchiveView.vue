@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useArchive, type ArchivedItem } from '../composables/useArchive'
-import { parseLabelRich, type RichSegment } from '../lib/time'
-import { tagHue } from '../lib/tags'
+import { parseTextRich, type RichSegment } from '../lib/time'
+import { tagHue, priorityLevel } from '../lib/tags'
 import { formatDateId, formatMonth, formatDayOfMonth, formatDayOfWeek } from '../lib/date'
 
 const props = defineProps<{ open: boolean }>()
@@ -17,8 +17,8 @@ function onSearchInput(): void {
   timer = setTimeout(() => search(term.value), 250)
 }
 
-function segmentsOf(label: string): RichSegment[] {
-  return parseLabelRich(label).segments
+function segmentsOf(text: string): RichSegment[] {
+  return parseTextRich(text).segments
 }
 
 interface DateGroup {
@@ -92,15 +92,22 @@ watch(
             <ul class="arch__list">
               <li v-for="it in g.items" :key="it.id" class="arch__item">
                 <span class="arch__check" aria-hidden="true">✓</span>
-                <span class="arch__label"><template
-                  v-for="(seg, i) in segmentsOf(it.label)"
+                <span class="arch__label"><span
+                  v-for="(tag, ti) in it.tags"
+                  :key="`tag-${ti}`"
+                ><span
+                    v-if="priorityLevel(tag)"
+                    class="prio-badge"
+                    :class="`-${priorityLevel(tag)}`"
+                  >{{ priorityLevel(tag)?.toUpperCase() }}</span><span
+                    v-else
+                    class="tag-chip"
+                    :style="{ '--tag-h': tagHue(tag) }"
+                  >{{ '#' + tag }}</span><template v-if="ti < it.tags.length - 1 || it.text"> </template></span><template
+                  v-for="(seg, i) in segmentsOf(it.text)"
                   :key="i"
                 ><span
-                    v-if="seg.kind === 'tag'"
-                    class="tag-chip"
-                    :style="{ '--tag-h': tagHue(seg.tag ?? '') }"
-                  >{{ seg.text }}</span><span
-                    v-else-if="seg.kind === 'time'"
+                    v-if="seg.kind === 'time'"
                     class="time-chip"
                     :class="{ '-cross': seg.time?.crossMidnight }"
                   >{{ seg.text }}</span><span

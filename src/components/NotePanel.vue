@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import { useNotes } from '../composables/useNotes'
-import { parseLabelRich, type RichSegment } from '../lib/time'
-import { tagHue } from '../lib/tags'
+import { parseTextRich, type RichSegment } from '../lib/time'
 import NoteEditor from './NoteEditor.vue'
 
 const { activeItem, close, loadNote, saveNote } = useNotes()
@@ -18,7 +17,7 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined
 let loadedFor: string | null = null
 
 const titleSegments = computed<RichSegment[]>(() =>
-  activeItem.value ? parseLabelRich(activeItem.value.label).segments : [],
+  activeItem.value ? parseTextRich(activeItem.value.label).segments : [],
 )
 
 const statusText = computed(() => {
@@ -121,11 +120,7 @@ function onClose(): void {
           v-for="(seg, i) in titleSegments"
           :key="i"
         ><span
-            v-if="seg.kind === 'tag'"
-            class="tag-chip"
-            :style="{ '--tag-h': tagHue(seg.tag ?? '') }"
-          >{{ seg.text }}</span><span
-            v-else-if="seg.kind === 'time'"
+            v-if="seg.kind === 'time'"
             class="time-chip"
             :class="{ '-cross': seg.time?.crossMidnight }"
           >{{ seg.text }}</span><span

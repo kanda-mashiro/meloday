@@ -1,8 +1,6 @@
-// Inline time support. A todo label can carry a time anywhere in its body — just
-// type it (e.g. "13:30 开会", "复盘 15:00-16:00", "和老板 14:00 对齐"). Like tags,
-// this only affects rendering + sorting; the label text is untouched.
-
-import { parseLabel } from './tags'
+// Inline time support. A todo's body text can carry a time anywhere in it — just
+// type it (e.g. "13:30 开会", "复盘 15:00-16:00", "和老板 14:00 对齐"). This only
+// affects rendering + sorting; the text itself is untouched.
 
 // A valid 24h time: 00:00–23:59, two-digit minutes.
 const T = '(?:[01]?\\d|2[0-3]):[0-5]\\d'
@@ -81,32 +79,24 @@ function scanTimes(text: string, onTime: (t: TimeInfo) => void): RichSegment[] {
 
 export interface ParsedRich {
   segments: RichSegment[]
-  tags: string[]
-  /** The primary (first) time in the label, used for sorting. */
+  /** The primary (first) time in the text, used for sorting. */
   time: TimeInfo | null
 }
 
-export function parseLabelRich(label: string): ParsedRich {
-  const base = parseLabel(label)
-  const out: RichSegment[] = []
+/**
+ * Scan a body text for inline times, producing 'time' and 'text' segments (no
+ * 'tag' segments — tags are structured on the item now). The primary time is
+ * the first one found.
+ */
+export function parseTextRich(text: string): ParsedRich {
   let primary: TimeInfo | null = null
-
-  const claim = (t: TimeInfo) => {
+  const segments = scanTimes(text, (t) => {
     if (!primary) primary = t
-  }
-
-  for (const seg of base.segments) {
-    if (seg.tag) {
-      out.push({ kind: 'tag', text: seg.text, tag: seg.tag })
-      continue
-    }
-    out.push(...scanTimes(seg.text, claim))
-  }
-
-  return { segments: out, tags: base.tags, time: primary }
+  })
+  return { segments, time: primary }
 }
 
-/** The primary time of a label, for sorting (null if none). */
-export function getTime(label: string): TimeInfo | null {
-  return parseLabelRich(label).time
+/** The primary time of a body text, for sorting (null if none). */
+export function getTime(text: string): TimeInfo | null {
+  return parseTextRich(text).time
 }

@@ -7,7 +7,7 @@ import type {
 } from '../types/todo'
 import { uuid } from './uuid'
 import { formatDateId } from './date'
-import { parseLabel, topPriority, priorityLevel } from './tags'
+import { topPriority, priorityLevel } from './tags'
 import { getTime } from './time'
 import { daysUntil } from './due'
 
@@ -96,7 +96,7 @@ export function getCustomTodoLists(data: TodoData): ResolvedCustomList[] {
 
 export function addTodoItem(
   data: TodoData,
-  input: { listId: string; label: string; due?: string },
+  input: { listId: string; tags: string[]; text: string; due?: string },
   now: Date = new Date()
 ): TodoData {
   const existing = data.items.filter((item) => item.listId === input.listId)
@@ -106,7 +106,8 @@ export function addTodoItem(
     id: uuid(),
     listId: input.listId,
     index: maxIndex + 1,
-    label: input.label,
+    tags: input.tags ?? [],
+    text: input.text ?? '',
     done: false,
     fixed: isListInThePast(input.listId, now),
     // Carry the optional inline deadline through; omitted when absent.
@@ -142,15 +143,14 @@ export function checkTodoItem(
 
 export function editTodoItem(
   data: TodoData,
-  input: { id: string; label: string; due?: string }
+  input: { id: string; tags: string[]; text: string; due?: string }
 ): TodoData {
   return {
     ...data,
     items: data.items.map((item) => {
       if (item.id !== input.id) return item
-      const next: TodoItem = { ...item, label: input.label }
-      // The editor round-trips the deadline as a !date token, so the edited text
-      // is the source of truth: set it, or drop it when the token is gone.
+      const next: TodoItem = { ...item, tags: input.tags, text: input.text }
+      // A provided due sets the deadline; undefined clears it.
       if (input.due) next.due = input.due
       else delete next.due
       return next
@@ -219,13 +219,13 @@ export function deleteTodoItem(
 }
 
 /**
- * The first tag of a label whose `priorityLevel` is null — i.e. its primary
- * CONTENT tag, ignoring priority tags (p0/p1/p2). '' when it has none. This is
- * what groups items, so a "p0 #for me" item lives in the #for me group rather
- * than a phantom "p0" group, and a bare "p0 test" item has no content group.
+ * The first tag whose `priorityLevel` is null — i.e. the item's primary CONTENT
+ * tag, ignoring priority tags (p0/p1/p2). '' when it has none. This is what
+ * groups items, so a "p0 #for me" item lives in the #for me group rather than a
+ * phantom "p0" group, and a bare "p0 test" item has no content group.
  */
-function contentPrimaryTag(label: string): string {
-  for (const tag of parseLabel(label).tags) {
+function contentPrimaryTag(tags: string[]): string {
+  for (const tag of tags) {
     if (priorityLevel(tag) === null) return tag.toLowerCase()
   }
   return ''
@@ -257,25 +257,25 @@ export function sortListItems(
   // Group order is a FIXED alphabetical (pinyin for CJK) order of the content
   // tags, independent of how the list is currently arranged — so dragging one
   // item never reshuffles whole groups. Untagged ('') sorts after all groups.
-  const tagNames = [...new Set(current.map((item) => contentPrimaryTag(item.label)))]
+  const tagNames = [...new Set(current.map((item) => contentPrimaryTag(item.tags)))]
   tagNames.sort((a, b) =>
     a === b ? 0 : a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'zh'),
   )
   const tagRankByName = new Map(tagNames.map((name, i) => [name, i]))
 
   // Priority → rank; 'none' sorts after p2.
-  const prioRank = (label: string): number => {
-    const top = topPriority(parseLabel(label).tags)
+  const prioRank = (tags: string[]): number => {
+    const top = topPriority(tags)
     return top === null ? 3 : Number(top.slice(1))
   }
 
   const keyed = current.map((item, originalIndex) => {
-    const time = getTime(item.label)
+    const time = getTime(item.text)
     return {
       item,
       originalIndex,
-      prioRank: prioRank(item.label),
-      tagRank: tagRankByName.get(contentPrimaryTag(item.label)) ?? 0,
+      prioRank: prioRank(item.tags),
+      tagRank: tagRankByName.get(contentPrimaryTag(item.tags)) ?? 0,
       // Whole days until the deadline; no deadline sinks to the bottom.
       dueDays: item.due ? daysUntil(item.due, now) : Infinity,
       time: time ? time.start : Infinity,

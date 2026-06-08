@@ -15,7 +15,8 @@ create table if not exists public.todo_items (
   user_id      uuid not null references auth.users on delete cascade,
   list_id      text not null,               -- 'YYYY-MM-DD' day, a custom-list uuid, or inbox
   idx          int  not null default 0,     -- order within the list
-  label        text not null default '',
+  tags         jsonb not null default '[]', -- ordered tag names (without '#')
+  body         text not null default '',    -- the body text ('body', not 'text', to dodge the SQL keyword)
   done         boolean not null default false,
   fixed        boolean not null default false,  -- added to a past day → doesn't roll forward
   completed_at timestamptz,                 -- when last marked done (null when undone)
@@ -24,8 +25,9 @@ create table if not exists public.todo_items (
   updated_at   timestamptz not null default now()
 );
 
--- If the table already exists, add the deadline column:
---   alter table public.todo_items add column if not exists due timestamptz;
+-- If the table already exists, move to the structured tags model:
+--   alter table public.todo_items add column if not exists tags jsonb not null default '[]';
+--   alter table public.todo_items rename column label to body;
 
 -- Active board reads (a user's live items, by list).
 create index if not exists todo_items_user_list_idx

@@ -4,8 +4,7 @@ import { useFocusSession } from '../composables/useFocusSession'
 import { useNotes } from '../composables/useNotes'
 import { useAmbientSound } from '../composables/useAmbientSound'
 import AmbientControls from './AmbientControls.vue'
-import { parseLabelRich, type RichSegment } from '../lib/time'
-import { tagHue } from '../lib/tags'
+import { parseTextRich, type RichSegment } from '../lib/time'
 
 const {
   target,
@@ -32,7 +31,7 @@ watch(target, (t) => {
 })
 
 const segments = computed<RichSegment[]>(() =>
-  target.value ? parseLabelRich(target.value.label).segments : [],
+  target.value ? parseTextRich(target.value.label).segments : [],
 )
 
 const phaseLabel = computed(() => {
@@ -78,11 +77,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <p class="fs__eyebrow">{{ phaseLabel }}</p>
 
       <h2 class="fs__task"><template v-for="(seg, i) in segments" :key="i"><span
-            v-if="seg.kind === 'tag'"
-            class="tag-chip"
-            :style="{ '--tag-h': tagHue(seg.tag ?? '') }"
-          >{{ seg.text }}</span><span
-            v-else-if="seg.kind === 'time'"
+            v-if="seg.kind === 'time'"
             class="time-chip"
             :class="{ '-cross': seg.time?.crossMidnight }"
           >{{ seg.text }}</span><span v-else>{{ seg.text }}</span></template></h2>

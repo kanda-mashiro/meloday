@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
+import type { TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useImeEnter } from '../composables/useImeEnter'
-import { buildLabel, tagHue, priorityLevel, topPriority } from '../lib/tags'
+import { tagHue, priorityLevel, topPriority } from '../lib/tags'
 import { parseDue, dueRelative, dueUrgency } from '../lib/due'
 
-const props = defineProps<{ listId: string }>()
-const emit = defineEmits<{ blurEmpty: []; captured: [] }>()
+const props = withDefaults(
+  defineProps<{ listId: string; mode?: 'add' | 'edit'; editItem?: TodoItem }>(),
+  { mode: 'add' },
+)
+const emit = defineEmits<{ blurEmpty: []; captured: []; done: [] }>()
 
 const store = useTodoStore()
 
@@ -15,7 +19,7 @@ type Mode = 'body' | 'tag' | 'date'
 const tags = ref<string[]>([])
 const text = ref('')
 const due = ref<string | null>(null)
-const mode = ref<Mode>('body')
+const inputMode = ref<Mode>('body')
 const inputEl = ref<HTMLInputElement | null>(null)
 const rootEl = ref<HTMLElement | null>(null)
 
@@ -27,18 +31,18 @@ const priority = computed(() => topPriority(tags.value))
 // slip past it, so this also converts a marker that lands at the start of the
 // body — then strips it, since the marker itself isn't part of the tag.
 watch(text, (val) => {
-  if (mode.value === 'body' && (val[0] === '#' || val[0] === '＃')) {
-    mode.value = 'tag'
+  if (inputMode.value === 'body' && (val[0] === '#' || val[0] === '＃')) {
+    inputMode.value = 'tag'
     text.value = val.slice(1)
-  } else if (mode.value === 'body' && (val[0] === '!' || val[0] === '！')) {
-    mode.value = 'date'
+  } else if (inputMode.value === 'body' && (val[0] === '!' || val[0] === '！')) {
+    inputMode.value = 'date'
     text.value = val.slice(1)
   }
 })
 
 const placeholder = computed(() => {
-  if (mode.value === 'tag') return 'tag… (Enter to seal)'
-  if (mode.value === 'date') return '明天 / 周五 / 6/20…'
+  if (inputMode.value === 'tag') return 'tag… (Enter to seal)'
+  if (inputMode.value === 'date') return '明天 / 周五 / 6/20…'
   return tags.value.length ? 'what to do…' : 'Add todo…'
 })
 
@@ -49,7 +53,7 @@ const dueUrgencyClass = computed(() => (due.value ? `-${dueUrgency(due.value)}` 
 // way trySealDate will. Null until a full expression parses (so "3" before
 // "3天后" shows nothing — no flicker), then drives a light "→ {relative}" hint.
 const previewDue = computed(() =>
-  mode.value === 'date' ? parseDue('!' + text.value.trim()).due : null,
+  inputMode.value === 'date' ? parseDue('!' + text.value.trim()).due : null,
 )
 const previewUrgencyClass = computed(() =>
   previewDue.value ? `-${dueUrgency(previewDue.value)}` : '',
@@ -61,18 +65,47 @@ function focus(): void {
 
 defineExpose({ focus })
 
+// Edit mode: prefill from the item and focus with the cursor at the end (not
+// select-all), so the editor opens ready to continue typing.
+onMounted(() => {
+  if (props.mode === 'edit' && props.editItem) {
+    tags.value = [...props.editItem.tags]
+    text.value = props.editItem.text
+    due.value = props.editItem.due ?? null
+    const el = inputEl.value
+    if (el) {
+      el.focus()
+      const end = el.value.length
+      el.setSelectionRange(end, end)
+    }
+  }
+})
+
 // Click-away: empty → let the parent dismiss the add-row; has content → commit
 // it so a typed draft isn't silently lost. Focus moving to something inside the
 // row (e.g. a tag's × button) isn't a real blur, so ignore it.
+// Set once the editor has handed control back (Escape-cancel or a commit), so a
+// trailing blur from the unmount doesn't fire a second commit.
+let closing = false
+
 function onBlur(e: FocusEvent): void {
   const next = e.relatedTarget as Node | null
   if (next && rootEl.value?.contains(next)) return
+  if (closing) return
+  if (inputMode.value === 'tag') sealTag()
+  else if (inputMode.value === 'date') sealDate()
+
+  // Edit mode: a real click-away commits the edit and closes the editor (even
+  // when emptied — submit() then deletes the item).
+  if (props.mode === 'edit') {
+    submit()
+    return
+  }
+
   if (text.value.trim() === '' && tags.value.length === 0 && due.value === null) {
     emit('blurEmpty')
     return
   }
-  if (mode.value === 'tag') sealTag()
-  else if (mode.value === 'date') sealDate()
   submit()
   // Clicked away → also close the now-empty add row.
   emit('blurEmpty')
@@ -89,18 +122,25 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.isComposing || e.keyCode === 229) return
 
   if (e.key === 'Escape') {
+    // Edit mode: cancel without saving and close the editor.
+    if (props.mode === 'edit') {
+      e.preventDefault()
+      closing = true
+      emit('done')
+      return
+    }
     text.value = ''
     tags.value = []
     due.value = null
-    mode.value = 'body'
+    inputMode.value = 'body'
     inputEl.value?.blur()
     return
   }
 
   // '#' on an empty field enters tag mode (the '#' itself isn't typed).
-  if ((e.key === '#' || e.key === '＃') && mode.value === 'body' && text.value === '') {
+  if ((e.key === '#' || e.key === '＃') && inputMode.value === 'body' && text.value === '') {
     e.preventDefault()
-    mode.value = 'tag'
+    inputMode.value = 'tag'
     return
   }
 
@@ -108,18 +148,18 @@ function onKeydown(e: KeyboardEvent): void {
   // mirroring tag mode. Only one deadline, so skip if one is already sealed.
   if (
     (e.key === '!' || e.key === '！') &&
-    mode.value === 'body' &&
+    inputMode.value === 'body' &&
     text.value === '' &&
     due.value === null
   ) {
     e.preventDefault()
-    mode.value = 'date'
+    inputMode.value = 'date'
     return
   }
 
   // Space seals a date in date mode if the typed expression parses (mirrors how
   // Enter seals); otherwise it falls through as a normal space.
-  if (e.key === ' ' && mode.value === 'date' && trySealDate()) {
+  if (e.key === ' ' && inputMode.value === 'date' && trySealDate()) {
     e.preventDefault()
     return
   }
@@ -129,9 +169,9 @@ function onKeydown(e: KeyboardEvent): void {
     // The IME-confirming Enter that Safari delivers just after compositionend:
     // it only commits the candidate, it must not also submit the todo.
     if (isImeEnter(e)) return
-    if (mode.value === 'tag') {
+    if (inputMode.value === 'tag') {
       sealTag()
-    } else if (mode.value === 'date') {
+    } else if (inputMode.value === 'date') {
       // Only leave date mode once a valid deadline parses; stay put on garbage.
       trySealDate()
     } else {
@@ -142,21 +182,21 @@ function onKeydown(e: KeyboardEvent): void {
 
   if (e.key === 'Backspace') {
     // Leave tag mode if the in-progress tag is empty.
-    if (mode.value === 'tag' && text.value === '') {
+    if (inputMode.value === 'tag' && text.value === '') {
       e.preventDefault()
-      mode.value = 'body'
+      inputMode.value = 'body'
       return
     }
     // Leave date mode if the in-progress date is empty.
-    if (mode.value === 'date' && text.value === '') {
+    if (inputMode.value === 'date' && text.value === '') {
       e.preventDefault()
-      mode.value = 'body'
+      inputMode.value = 'body'
       return
     }
     // Pull the last sealed tag back into edit when at the start of an empty body.
-    if (mode.value === 'body' && text.value === '' && tags.value.length) {
+    if (inputMode.value === 'body' && text.value === '' && tags.value.length) {
       e.preventDefault()
-      mode.value = 'tag'
+      inputMode.value = 'tag'
       text.value = tags.value.pop() ?? ''
     }
   }
@@ -166,7 +206,7 @@ function sealTag(): void {
   const name = text.value.trim()
   if (name) tags.value.push(name)
   text.value = ''
-  mode.value = 'body'
+  inputMode.value = 'body'
 }
 
 function removeTag(index: number): void {
@@ -182,7 +222,7 @@ function trySealDate(): boolean {
   if (!parsed) return false
   due.value = parsed
   text.value = ''
-  mode.value = 'body'
+  inputMode.value = 'body'
   return true
 }
 
@@ -191,7 +231,7 @@ function trySealDate(): boolean {
 function sealDate(): void {
   trySealDate()
   text.value = ''
-  mode.value = 'body'
+  inputMode.value = 'body'
 }
 
 function clearDue(): void {
@@ -200,23 +240,43 @@ function clearDue(): void {
 }
 
 function submit(): void {
-  // The deadline lives in `due` (sealed via date mode), so the label is just
-  // tags + remaining text. Still run parseDue to lift any stray inline !token a
-  // user typed mid-text, preferring an already-sealed `due` over it.
-  const raw = buildLabel(tags.value, text.value)
-  const { text: label, due: inlineDue } = parseDue(raw)
-  // Nothing to add unless there's a label — but a bare deadline with tags still
-  // counts (label comes from the tags then).
-  if (!label && due.value === null) return
+  // The deadline lives in `due` (sealed via date mode); the body is plain text.
+  // Still run parseDue to lift any stray inline !token a user typed mid-text,
+  // preferring an already-sealed `due` over it.
+  const { text: body, due: inlineDue } = parseDue(text.value)
+  const finalText = body.trim()
+  const finalDue = due.value ?? inlineDue ?? undefined
+
+  if (props.mode === 'edit' && props.editItem) {
+    closing = true
+    // Emptied out entirely → delete the item; otherwise commit the edit.
+    if (tags.value.length === 0 && finalText === '') {
+      store.deleteItem({ id: props.editItem.id })
+    } else {
+      store.editItem({
+        id: props.editItem.id,
+        tags: tags.value,
+        text: finalText,
+        due: finalDue,
+      })
+    }
+    emit('done')
+    return
+  }
+
+  // Add mode: nothing to add unless there are tags or some text (a bare deadline
+  // alone isn't enough on its own).
+  if (tags.value.length === 0 && finalText === '') return
   store.addItem({
     listId: props.listId,
-    label,
-    due: due.value ?? inlineDue ?? undefined,
+    tags: tags.value,
+    text: finalText,
+    due: finalDue,
   })
   tags.value = []
   text.value = ''
   due.value = null
-  mode.value = 'body'
+  inputMode.value = 'body'
   emit('captured')
 }
 </script>
@@ -226,7 +286,7 @@ function submit(): void {
     ref="rootEl"
     class="todo-item-input"
     :class="[
-      { '-tagging': mode === 'tag', '-dating': mode === 'date' },
+      { '-tagging': inputMode === 'tag', '-dating': inputMode === 'date' },
       priority ? `-prio-${priority}` : '',
     ]"
     @click="focus"
@@ -266,14 +326,14 @@ function submit(): void {
         @click.stop="clearDue"
       >×</button></span>
 
-    <span v-if="mode === 'tag'" class="todo-item-input__hash">#</span>
-    <span v-if="mode === 'date'" class="todo-item-input__bang">!</span>
+    <span v-if="inputMode === 'tag'" class="todo-item-input__hash">#</span>
+    <span v-if="inputMode === 'date'" class="todo-item-input__bang">!</span>
 
     <input
       ref="inputEl"
       v-model="text"
       class="todo-item-input__field"
-      :class="{ '-tag': mode === 'tag', '-date': mode === 'date' }"
+      :class="{ '-tag': inputMode === 'tag', '-date': inputMode === 'date' }"
       type="text"
       :placeholder="placeholder"
       autocomplete="off"
