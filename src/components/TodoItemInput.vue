@@ -566,6 +566,12 @@ function submit(): void {
    supplies the row height + padding, so drop the add-row's full --line-h sizing
    and own padding — otherwise the editing row balloons taller than saved rows. */
 .todo-item-input.-edit {
+  /* Fill the row like the .todo-item__label this replaces — otherwise the editor
+     shrinks to its content and the body field can't grow into the free space,
+     clipping long text mid-row. min-width:0 lets it shrink so long text scrolls
+     inside the input instead of widening the row. */
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   padding: 0;
   /* Baseline-align chips with the body text (matching the display row, which is
