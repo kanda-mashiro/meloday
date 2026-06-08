@@ -97,6 +97,7 @@ function closeMenu(): void {
     @contextmenu.prevent="openMenu($event)"
   >
     <button
+      v-if="!editing"
       class="todo-item__check"
       type="button"
       role="checkbox"
@@ -135,7 +136,7 @@ function closeMenu(): void {
           :class="{ '-on': activeTag === tag.toLowerCase() }"
           :style="{ '--tag-h': tagHue(tag) }"
           @click.stop="toggleTag(tag)"
-        >{{ '#' + tag }}</span><template v-if="ti < item.tags.length - 1 || item.text"> </template></span><template v-for="(seg, i) in segments" :key="i"><span
+        >{{ '#' + tag }}</span></span><template v-for="(seg, i) in segments" :key="i"><span
         v-if="seg.kind === 'time'"
         class="time-chip"
         :class="{ '-cross': seg.time?.crossMidnight }"
@@ -153,7 +154,7 @@ function closeMenu(): void {
       </svg>{{ dueLabel }}</span>
 
     <button
-      v-if="focusable"
+      v-if="focusable && !editing"
       class="todo-item__focus"
       type="button"
       title="专注做这件事"
@@ -166,6 +167,7 @@ function closeMenu(): void {
     </button>
 
     <button
+      v-if="!editing"
       class="todo-item__note"
       :class="{ '-has': hasNote }"
       type="button"
@@ -180,6 +182,7 @@ function closeMenu(): void {
     </button>
 
     <button
+      v-if="!editing"
       class="todo-item__delete"
       type="button"
       title="Delete"
@@ -276,6 +279,13 @@ function closeMenu(): void {
 
 .todo-item.-done .todo-item__tick {
   stroke: var(--main-bg);
+}
+
+/* Breathing room between each tag chip and the next chip / the body text
+   (replaces the old single-space separator for a steadier, roomier gap). */
+.todo-item__label .tag-chip,
+.todo-item__label .prio-badge {
+  margin-right: 0.4rem;
 }
 
 .todo-item__label {

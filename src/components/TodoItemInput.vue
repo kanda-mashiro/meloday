@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import type { TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useImeEnter } from '../composables/useImeEnter'
@@ -22,6 +22,18 @@ const due = ref<string | null>(null)
 const inputMode = ref<Mode>('body')
 const inputEl = ref<HTMLInputElement | null>(null)
 const rootEl = ref<HTMLElement | null>(null)
+// In-place tag editing: the chip at `editIdx` becomes editable text (a
+// contenteditable span — auto-sizes to its content natively, so no width/caret
+// hacks) right where it sits, while the body stays put and visible.
+const editIdx = ref<number | null>(null)
+const editTagText = ref('')
+const tagEditEl = ref<HTMLElement | null>(null)
+function setTagEditEl(el: unknown): void {
+  tagEditEl.value = (el as HTMLElement) ?? null
+}
+function onTagInput(e: Event): void {
+  editTagText.value = (e.target as HTMLElement).textContent ?? ''
+}
 
 // Highest priority among the entered tags — drives the row's left accent strip.
 const priority = computed(() => topPriority(tags.value))
@@ -193,11 +205,15 @@ function onKeydown(e: KeyboardEvent): void {
       inputMode.value = 'body'
       return
     }
-    // Pull the last sealed tag back into edit when at the start of an empty body.
-    if (inputMode.value === 'body' && text.value === '' && tags.value.length) {
-      e.preventDefault()
-      inputMode.value = 'tag'
-      text.value = tags.value.pop() ?? ''
+    // Backspace at the very START of the body opens the last tag for in-place
+    // editing (the chip becomes editable text where it sits; the body stays
+    // visible — it couldn't be edited from position 0 anyway).
+    if (inputMode.value === 'body' && tags.value.length) {
+      const el = inputEl.value
+      if (el && el.selectionStart === 0 && el.selectionEnd === 0) {
+        e.preventDefault()
+        startTagEdit(tags.value.length - 1)
+      }
     }
   }
 }
@@ -212,6 +228,78 @@ function sealTag(): void {
 function removeTag(index: number): void {
   tags.value.splice(index, 1)
   focus()
+}
+
+// --- in-place tag editing (the chip's text becomes editable, no separate box) -
+function startTagEdit(i: number): void {
+  if (i < 0 || i >= tags.value.length) return
+  editIdx.value = i
+  editTagText.value = tags.value[i]
+  void nextTick(() => {
+    const el = tagEditEl.value
+    if (!el) return
+    el.textContent = tags.value[i]
+    el.focus()
+    // Caret to the end of the contenteditable text.
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+  })
+}
+
+// Write the inline edit back to its tag (empty → drop the tag) and exit editing.
+function commitTagEdit(): void {
+  if (editIdx.value === null) return
+  const i = editIdx.value
+  const name = editTagText.value.trim()
+  if (name) tags.value[i] = name
+  else tags.value.splice(i, 1)
+  editIdx.value = null
+  editTagText.value = ''
+}
+
+function onTagEditKeydown(e: KeyboardEvent, i: number): void {
+  if (e.isComposing || e.keyCode === 229) return
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    if (isImeEnter(e)) return
+    commitTagEdit()
+    focus() // back to the body
+    return
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    editIdx.value = null // cancel without writing
+    editTagText.value = ''
+    focus()
+    return
+  }
+  // Backspace on an emptied tag removes it, then steps to the previous tag, or
+  // back to the start of the body when there are no more tags.
+  if (e.key === 'Backspace' && editTagText.value === '') {
+    e.preventDefault()
+    tags.value.splice(i, 1)
+    editIdx.value = null
+    if (i - 1 >= 0) {
+      startTagEdit(i - 1)
+    } else {
+      focus()
+      void nextTick(() => inputEl.value?.setSelectionRange(0, 0))
+    }
+  }
+}
+
+// Click-away from the inline tag input: commit it; if focus left the whole row,
+// also commit/close the editor like the body's blur would. Skipped once we've
+// already committed via Enter/Escape (which clears editIdx first).
+function onTagEditBlur(e: FocusEvent): void {
+  if (editIdx.value === null) return
+  commitTagEdit()
+  const next = e.relatedTarget as Node | null
+  if (!(next && rootEl.value?.contains(next))) onBlur(e)
 }
 
 // Parse the typed date expression (e.g. "明天", "6/20") by reusing parseDue
@@ -286,28 +374,50 @@ function submit(): void {
     ref="rootEl"
     class="todo-item-input"
     :class="[
-      { '-tagging': inputMode === 'tag', '-dating': inputMode === 'date' },
+      { '-tagging': inputMode === 'tag', '-dating': inputMode === 'date', '-edit': mode === 'edit' },
       priority ? `-prio-${priority}` : '',
     ]"
     @click="focus"
   >
     <!-- Sits in the checkbox slot so chips/text line up with saved items. -->
-    <span class="todo-item-input__bullet">+</span>
+    <!-- Slot where a saved row shows its checkbox: '+' when adding, a pencil
+         when editing an existing item (so the row reads as "being edited"). -->
+    <span class="todo-item-input__bullet"><svg
+        v-if="mode === 'edit'"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        style="width:0.95em;height:0.95em;display:block"
+      ><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg><template v-else>+</template></span>
 
-    <span
-      v-for="(t, i) in tags"
-      :key="i"
-      :class="
-        priorityLevel(t) ? ['prio-badge', '-static', `-${priorityLevel(t)}`] : ['tag-chip', '-static']
-      "
-      :style="priorityLevel(t) ? undefined : { '--tag-h': tagHue(t) }"
-    >{{ priorityLevel(t) ? priorityLevel(t)?.toUpperCase() : '#' + t }}<button
-        class="todo-item-input__x"
-        type="button"
-        aria-label="Remove tag"
-        @mousedown.prevent
-        @click.stop="removeTag(i)"
-      >×</button></span>
+    <template v-for="(t, i) in tags" :key="i"><span
+        v-if="editIdx === i"
+        class="todo-item-input__tagedit"
+      ><span class="todo-item-input__tagedit-hash">#</span><span
+          :ref="setTagEditEl"
+          class="todo-item-input__tagedit-text"
+          contenteditable="plaintext-only"
+          @input="onTagInput"
+          @keydown="onTagEditKeydown($event, i)"
+          @compositionend="onCompositionEnd"
+          @blur="onTagEditBlur"
+        ></span></span><span
+        v-else
+        :class="
+          priorityLevel(t) ? ['prio-badge', '-static', `-${priorityLevel(t)}`] : ['tag-chip', '-static']
+        "
+        :style="priorityLevel(t) ? undefined : { '--tag-h': tagHue(t) }"
+      >{{ priorityLevel(t) ? priorityLevel(t)?.toUpperCase() : '#' + t }}<button
+          class="todo-item-input__x"
+          type="button"
+          aria-label="Remove tag"
+          @mousedown.prevent
+          @click.stop="removeTag(i)"
+        >×</button></span></template>
 
     <!-- Sealed deadline chip: a quiet countdown whose color escalates with
          urgency, mirroring the saved item's due badge. -->
@@ -370,6 +480,29 @@ function submit(): void {
   cursor: text;
 }
 
+/* Edit mode: this input is embedded inside a .todo-item row that already
+   supplies the row height + padding, so drop the add-row's full --line-h sizing
+   and own padding — otherwise the editing row balloons taller than saved rows. */
+.todo-item-input.-edit {
+  min-height: 0;
+  padding: 0;
+  /* Baseline-align chips with the body text (matching the display row, which is
+     inline/baseline) so the chip doesn't sit a touch higher than in display. */
+  align-items: baseline;
+  /* The outer .todo-item already draws the ruled hairline; suppress this inner
+     one so the editing row doesn't get a doubled underline. */
+  border-bottom: none;
+}
+
+/* Keep the +/pencil marker vertically centered even with baseline rows. */
+.todo-item-input.-edit .todo-item-input__bullet {
+  align-self: center;
+}
+
+.todo-item-input.-edit .todo-item-input__field {
+  height: auto;
+}
+
 /* Left accent strip mirrors the saved priority rows. */
 .todo-item-input.-prio-p0::before,
 .todo-item-input.-prio-p1::before,
@@ -397,8 +530,10 @@ function submit(): void {
 
 .todo-item-input__bullet {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.1rem;
-  text-align: center;
   color: var(--disabled-text);
   font-weight: 600;
   user-select: none;
@@ -431,6 +566,31 @@ function submit(): void {
   color: var(--main-text);
   font: inherit;
   padding: 0;
+  outline: none;
+}
+
+/* A tag being edited in place: just accent "#text", no box. The text is a
+   contenteditable span — it sizes to its content natively (no width/caret
+   hacks, works with CJK / variable-width fonts). */
+.todo-item-input__tagedit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* The '#' marker, lighter than the text — mirrors the add-row tag-mode marker. */
+.todo-item-input__tagedit-hash {
+  font-size: 0.9em;
+  opacity: 0.85;
+}
+
+.todo-item-input__tagedit-text {
+  min-width: 1ch;
+  white-space: pre;
+  color: inherit;
   outline: none;
 }
 
