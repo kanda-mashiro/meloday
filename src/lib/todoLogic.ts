@@ -251,16 +251,17 @@ export function sortListItems(
   listId: string,
   now: Date = new Date()
 ): TodoData {
-  // Current order is the tie-breaker AND the source of the tag-appearance ranks.
+  // Current order is the stable tie-breaker for items within the same group.
   const current = itemsForList(data, listId)
 
-  // Rank content primary tags by first appearance among ALL items so groups
-  // don't reshuffle on re-sort.
-  const tagRankByName = new Map<string, number>()
-  for (const item of current) {
-    const tag = contentPrimaryTag(item.label)
-    if (!tagRankByName.has(tag)) tagRankByName.set(tag, tagRankByName.size)
-  }
+  // Group order is a FIXED alphabetical (pinyin for CJK) order of the content
+  // tags, independent of how the list is currently arranged — so dragging one
+  // item never reshuffles whole groups. Untagged ('') sorts after all groups.
+  const tagNames = [...new Set(current.map((item) => contentPrimaryTag(item.label)))]
+  tagNames.sort((a, b) =>
+    a === b ? 0 : a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'zh'),
+  )
+  const tagRankByName = new Map(tagNames.map((name, i) => [name, i]))
 
   // Priority → rank; 'none' sorts after p2.
   const prioRank = (label: string): number => {
