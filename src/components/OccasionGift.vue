@@ -76,6 +76,7 @@ onBeforeUnmount(() => {
     <div v-if="popoverOpen" class="occ-gift__popover">
       <ul v-if="dayOccasions.length" class="occ-gift__list">
         <li v-for="o in dayOccasions" :key="o.id" class="occ-gift__row">
+          <span class="occ-gift__dot" aria-hidden="true"></span>
           <span class="occ-gift__row-name">{{ o.name }}</span>
           <button
             class="occ-gift__remove"
@@ -142,79 +143,109 @@ onBeforeUnmount(() => {
 /* Small popover anchored under the gift icon, right-aligned to the button. */
 .occ-gift__popover {
   position: absolute;
-  top: 2.1rem;
+  top: 2.3rem;
   right: 0;
   z-index: 50;
-  width: 12.5rem;
+  width: 13rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.5rem;
+  gap: 0.3rem;
+  padding: 0.45rem;
   background: var(--main-bg);
   border: 1px solid var(--divider);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 14px 34px rgba(0, 0, 0, 0.12);
 }
 
 .occ-gift__list {
   list-style: none;
-  margin: 0;
-  padding: 0;
+  margin: 0 0 0.1rem;
+  padding: 0 0 0.35rem;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.1rem;
+  border-bottom: 1px solid var(--divider);
 }
 
 .occ-gift__row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.18rem 0.1rem 0.18rem 0.25rem;
+  gap: 0.5rem;
+  padding: 0.28rem 0.3rem 0.28rem 0.4rem;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+
+.occ-gift__row:hover {
+  background: var(--button-active-bg);
+}
+
+/* Small accent bullet leading each occasion. */
+.occ-gift__dot {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent, var(--highlight-text));
 }
 
 .occ-gift__row-name {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 500;
   color: var(--main-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The × stays hidden until the row is hovered (or keyboard-focused). */
 .occ-gift__remove {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.3rem;
+  height: 1.3rem;
   border: none;
   border-radius: 5px;
   background: transparent;
   color: var(--aside-text);
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.occ-gift__row:hover .occ-gift__remove,
+.occ-gift__remove:focus-visible {
+  opacity: 1;
 }
 
 .occ-gift__remove:hover {
-  background: var(--button-active-bg);
+  background: color-mix(in srgb, var(--main-text) 10%, transparent);
   color: var(--main-text);
 }
 
 .occ-gift__input {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.3rem 0.45rem;
-  font-size: 0.8rem;
+  padding: 0.42rem 0.55rem;
+  font-size: 0.82rem;
   color: var(--main-text);
   background: var(--panel-bg);
   border: 1px solid var(--divider);
-  border-radius: 6px;
+  border-radius: 7px;
   outline: none;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.occ-gift__input::placeholder {
+  color: var(--disabled-text);
 }
 
 .occ-gift__input:focus {
   border-color: var(--accent, var(--highlight-text));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, var(--highlight-text)) 18%, transparent);
 }
 </style>

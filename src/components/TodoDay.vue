@@ -31,9 +31,13 @@ const headerHover = ref(false);
              escapes the narrow column via z-index. -->
         <OccasionGift class="todo-day__gift" :date="day.date" :reveal="headerHover" />
       </div>
-      <!-- Today-only heads-up: upcoming occasions within 2 weeks. -->
-      <OccasionHeadsUp v-if="day.isToday" />
     </header>
+    <!-- Today-only heads-up: sits BELOW the header so it doesn't grow the header
+         (which is flex-end aligned) and shove the weekday out of line with the
+         other columns. -->
+    <div v-if="day.isToday" class="todo-day__headsup">
+      <OccasionHeadsUp />
+    </div>
     <div class="todo-day__body" :class="{ ruled: prefs.showLines }">
       <TodoList :list-id="day.id" :items="day.items" />
     </div>
@@ -85,8 +89,17 @@ const headerHover = ref(false);
   font-size: 1.25rem;
 }
 
-/* Heads-up a touch larger than the shared default so it reads in-column. */
-.todo-day__header :deep(.occ-headsup__row) {
+/* Today-only heads-up, below the header. Match the column's horizontal padding;
+   a touch larger than the shared default so it reads in-column. */
+.todo-day__headsup {
+  padding: 0 0.85rem 0.3rem;
+}
+
+.todo-day__headsup :deep(.occ-headsup) {
+  margin-top: 0;
+}
+
+.todo-day__headsup :deep(.occ-headsup__row) {
   font-size: 0.82rem;
 }
 
