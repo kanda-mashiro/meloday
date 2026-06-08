@@ -306,15 +306,17 @@ function closeMenu(): void {
   /* The label doubles as the drag handle (see TodoList's `handle`), so show a
      grab cursor to hint it's draggable. A click still edits; drag reorders. */
   cursor: grab;
-  /* Wrap long labels, but cap at 2 lines with an ellipsis so a pasted URL can't
-     balloon the row. Full text shows on hover (title) and when editing. */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  /* Chips + body flow inline and wrap; cap at 2 lines so a pasted URL can't
+     balloon the row (full text shows on hover via title, and when editing).
+     A plain max-height clip rather than -webkit-line-clamp: Safari's line-clamp
+     mis-truncates inline-flex chips mid-row (ellipsising a middle chip), so we
+     trade the trailing "…" for chips that render intact. */
+  display: block;
+  line-height: 1.45;
+  max-height: calc(1.45em * 2);
   overflow: hidden;
   overflow-wrap: anywhere;
   word-break: break-word;
-  line-height: 1.45;
   color: var(--main-text);
 }
 
