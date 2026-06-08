@@ -485,6 +485,11 @@ function init(): void {
   watch(
     user,
     (u, prev) => {
+      // React only to a real identity change (login / logout / switch account).
+      // On load getSession() and onAuthStateChange both set the user, and token
+      // refreshes re-fire with a fresh user object — re-subscribing then collides
+      // on the realtime channel ("cannot add postgres_changes after subscribe()").
+      if (u?.id === prev?.id) return
       teardown()
       if (u) {
         void hydrate(u.id)
