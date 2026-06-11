@@ -40,6 +40,10 @@ jobs:
       - name: Build & release (Tauri)
         uses: tauri-apps/tauri-action@v0
         env:
+          # tauri-action needs this to create the GitHub Release. It's the token
+          # GitHub injects automatically every run (paired with contents:write
+          # above) — nothing to add under Secrets.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The capture frontend reads these at build time (Vite inlines them).
           # Add them under repo Settings → Secrets and variables → Actions.
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
