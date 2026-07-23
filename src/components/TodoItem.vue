@@ -41,8 +41,15 @@ function toggleQueue(): void {
 }
 
 function onQueueControl(): void {
-  if (hasQueue.value) toggleQueue()
-  else void startAddingSubtask()
+  if (expanded.value) {
+    expanded.value = false
+    addingSubtask.value = false
+    editingSubtaskId.value = null
+  } else if (hasQueue.value) {
+    toggleQueue()
+  } else {
+    void startAddingSubtask()
+  }
 }
 
 function startEditingSubtask(item: TodoItem): void {
@@ -222,7 +229,7 @@ function closeMenu(): void {
         class="todo-item__queue-badge"
         :class="{ '-open': expanded, '-empty': !hasQueue }"
         type="button"
-        :title="hasQueue ? (expanded ? '收起子任务' : '展开子任务') : '添加子任务'"
+        :title="expanded ? '收起子任务' : (hasQueue ? '展开子任务' : '添加子任务')"
         @click.stop="onQueueControl"
       >
         <template v-if="hasQueue">
