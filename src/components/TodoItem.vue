@@ -362,7 +362,6 @@ function closeMenu(): void {
             >{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span>
             <span v-if="queue.current?.id === step.id && !step.done" class="todo-item-queue__now">当前</span>
             <button
-              v-if="queue.total > 1"
               class="todo-item-queue__remove"
               type="button"
               title="删除此步骤"
