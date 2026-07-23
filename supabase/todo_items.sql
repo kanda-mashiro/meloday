@@ -21,8 +21,8 @@ create table if not exists public.todo_items (
   fixed        boolean not null default false,  -- added to a past day → doesn't roll forward
   completed_at timestamptz,                 -- when last marked done (null when undone)
   due          timestamptz,                 -- optional deadline; date-only today, timestamptz leaves room for a time-of-day later
-  queue_root_id uuid,                       -- original/root task for a linear follow-up queue
-  queue_idx     int,                        -- follower order within that queue (1..n)
+  queue_root_id uuid,                       -- main task id for an ordered subtask
+  queue_idx     int,                        -- order among that main task's subtasks (1..n)
   deleted_at   timestamptz,                 -- soft-delete tombstone (kept forever; never resurrect)
   updated_at   timestamptz not null default now()
 );
@@ -30,7 +30,7 @@ create table if not exists public.todo_items (
 -- If the table already exists, move to the structured tags model:
 --   alter table public.todo_items add column if not exists tags jsonb not null default '[]';
 --   alter table public.todo_items rename column label to body;
--- Follow-up queue migration for an existing table (safe to review/run later):
+-- Ordered-subtask migration for an existing table (safe to review/run later):
 --   alter table public.todo_items add column if not exists queue_root_id uuid;
 --   alter table public.todo_items add column if not exists queue_idx int;
 

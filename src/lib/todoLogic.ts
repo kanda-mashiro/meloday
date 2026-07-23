@@ -3,7 +3,6 @@ import type {
   CustomList,
   TodoData,
   DayList,
-  ResolvedTodoItem,
   ResolvedCustomList,
   TodoQueue,
 } from '../types/todo'
@@ -31,8 +30,8 @@ function queueRootForItem(data: TodoData, item: TodoItem): TodoItem {
   return data.items.find((candidate) => candidate.id === item.queueRootId) ?? item
 }
 
-function queueMembersForRoot(data: TodoData, root: TodoItem): TodoItem[] {
-  const followers = data.items
+function subtasksForRoot(data: TodoData, root: TodoItem): TodoItem[] {
+  return data.items
     .filter((item) => item.queueRootId === root.id)
     .sort(
       (a, b) =>
@@ -40,18 +39,11 @@ function queueMembersForRoot(data: TodoData, root: TodoItem): TodoItem[] {
           (b.queueIndex ?? Number.MAX_SAFE_INTEGER) ||
         a.index - b.index,
     )
-  return [root, ...followers]
 }
 
 function rootsForList(data: TodoData, listId: string): TodoItem[] {
   return sortByIndex(
-    data.items.filter((item) => {
-      if (item.listId !== listId) return false
-      if (!item.queueRootId) return true
-      // A missing root should not make the task disappear forever. Treat an
-      // orphaned follower as a standalone row until sync repairs the chain.
-      return !data.items.some((candidate) => candidate.id === item.queueRootId)
-    }),
+    data.items.filter((item) => item.listId === listId && !item.queueRootId),
   )
 }
 
@@ -59,10 +51,11 @@ export function getTodoQueue(data: TodoData, itemId: string): TodoQueue | null {
   const item = data.items.find((candidate) => candidate.id === itemId)
   if (!item) return null
   const root = queueRootForItem(data, item)
-  const items = queueMembersForRoot(data, root)
-  const current = items.find((candidate) => !candidate.done) ?? root
+  const items = subtasksForRoot(data, root)
+  const current = items.find((candidate) => !candidate.done) ?? null
   return {
     rootId: root.id,
+    root,
     items,
     current,
     completed: items.filter((candidate) => candidate.done).length,
@@ -101,20 +94,8 @@ export function isListInThePast(listId: string, now: Date = new Date()): boolean
   return listId < formatDateId(now)
 }
 
-export function itemsForList(data: TodoData, listId: string): ResolvedTodoItem[] {
-  return rootsForList(data, listId).map((root) => {
-    const queue = getTodoQueue(data, root.id)
-    const current = queue?.current ?? root
-    return {
-      ...current,
-      // The root owns board placement. Keeping a stable anchor lets Vue retain
-      // the same row/component when completing one step reveals the next.
-      anchorId: root.id,
-      listId: root.listId,
-      index: root.index,
-      fixed: root.fixed,
-    }
-  })
+export function itemsForList(data: TodoData, listId: string): TodoItem[] {
+  return rootsForList(data, listId)
 }
 
 /**
@@ -178,16 +159,17 @@ export function addTodoItem(
   }
 }
 
-export function addFollowUpTodoItem(
+export function addTodoSubtask(
   data: TodoData,
-  input: { afterId: string; tags: string[]; text: string; due?: string },
+  input: { rootId: string; tags: string[]; text: string; due?: string },
   now: Date = new Date(),
 ): TodoData {
-  const after = data.items.find((item) => item.id === input.afterId)
-  if (!after) return data
-  const root = queueRootForItem(data, after)
-  const members = queueMembersForRoot(data, root)
-  const maxQueueIndex = members.reduce(
+  const root = data.items.find(
+    (item) => item.id === input.rootId && !item.queueRootId,
+  )
+  if (!root) return data
+  const subtasks = subtasksForRoot(data, root)
+  const maxQueueIndex = subtasks.reduce(
     (max, item) => Math.max(max, item.queueIndex ?? 0),
     0,
   )
@@ -207,7 +189,14 @@ export function addFollowUpTodoItem(
 
   return {
     ...data,
-    items: [...data.items, newItem],
+    items: [
+      ...data.items.map((item) =>
+        item.id === root.id
+          ? { ...item, done: false, completedAt: undefined }
+          : item,
+      ),
+      newItem,
+    ],
   }
 }
 
@@ -216,6 +205,47 @@ export function checkTodoItem(
   input: { id: string; done: boolean },
   now: Date = new Date()
 ): TodoData {
+  const target = data.items.find((item) => item.id === input.id)
+  if (!target) return data
+  const root = queueRootForItem(data, target)
+  const subtasks = subtasksForRoot(data, root)
+  const completedAt = input.done ? now.toISOString() : undefined
+
+  // A main task with subtasks is an aggregate checkbox: completing it completes
+  // every subtask, while reopening it reopens the whole group.
+  if (target.id === root.id && subtasks.length > 0) {
+    return {
+      ...data,
+      items: data.items.map((item) =>
+        item.id === root.id || item.queueRootId === root.id
+          ? { ...item, done: input.done, completedAt }
+          : item,
+      ),
+    }
+  }
+
+  // Completing one subtask advances the current pointer. The main task mirrors
+  // the aggregate state and becomes done only when every subtask is done.
+  if (target.queueRootId) {
+    const nextSubtasks = subtasks.map((item) =>
+      item.id === target.id
+        ? { ...item, done: input.done, completedAt }
+        : item,
+    )
+    const rootDone = nextSubtasks.length > 0 && nextSubtasks.every((item) => item.done)
+    const rootCompletedAt = rootDone ? now.toISOString() : undefined
+    const byId = new Map(nextSubtasks.map((item) => [item.id, item]))
+    return {
+      ...data,
+      items: data.items.map((item) => {
+        if (item.id === root.id) {
+          return { ...item, done: rootDone, completedAt: rootCompletedAt }
+        }
+        return byId.get(item.id) ?? item
+      }),
+    }
+  }
+
   return {
     ...data,
     items: data.items.map((item) =>
@@ -223,9 +253,7 @@ export function checkTodoItem(
         ? {
             ...item,
             done: input.done,
-            // Stamp completion time so it can age into the archive; clear it
-            // when un-done so it never archives while active.
-            completedAt: input.done ? now.toISOString() : undefined,
+            completedAt,
           }
         : item
     ),
@@ -310,84 +338,41 @@ export function moveTodoItem(
 
 export function deleteTodoItem(
   data: TodoData,
-  input: { id: string }
+  input: { id: string },
+  now: Date = new Date(),
 ): TodoData {
   const removed = data.items.find((item) => item.id === input.id)
   if (!removed) return data
 
-  // Removing a follower keeps the root and compacts the remaining queue order.
-  if (removed.queueRootId) {
-    const followers = data.items
-      .filter(
-        (item) =>
-          item.queueRootId === removed.queueRootId && item.id !== removed.id,
-      )
-      .sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0))
-    const queueIndex = new Map(
-      followers.map((item, index) => [item.id, index + 1]),
-    )
-    return {
-      ...data,
-      items: data.items
-        .filter((item) => item.id !== removed.id)
-        .map((item) => {
-          const index = queueIndex.get(item.id)
-          return index === undefined ? item : { ...item, queueIndex: index }
-        }),
-    }
-  }
+  // Deleting a main task deletes its entire subtask group.
+  if (!removed.queueRootId) return deleteTodoQueue(data, input)
 
-  const followers = data.items
-    .filter((item) => item.queueRootId === removed.id)
+  // Deleting one subtask keeps the main task and compacts sibling order.
+  const subtasks = data.items
+    .filter(
+      (item) =>
+        item.queueRootId === removed.queueRootId && item.id !== removed.id,
+    )
     .sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0))
-
-  // Deleting a root step promotes its first follower so the rest of the queue
-  // survives in the same board slot instead of being orphaned or disappearing.
-  if (followers.length > 0) {
-    const promoted = followers[0]
-    const remainingFollowers = followers.slice(1)
-    const queueIndex = new Map(
-      remainingFollowers.map((item, index) => [item.id, index + 1]),
-    )
-    return {
-      ...data,
-      items: data.items
-        .filter((item) => item.id !== removed.id)
-        .map((item) => {
-          if (item.id === promoted.id) {
-            const next: TodoItem = {
-              ...item,
-              listId: removed.listId,
-              index: removed.index,
-              fixed: removed.fixed,
-            }
-            delete next.queueRootId
-            delete next.queueIndex
-            return next
-          }
-          if (item.queueRootId !== removed.id) return item
-          return {
-            ...item,
-            queueRootId: promoted.id,
-            queueIndex: queueIndex.get(item.id) ?? item.queueIndex,
-            listId: removed.listId,
-            index: removed.index,
-            fixed: removed.fixed,
-          }
-        }),
-    }
-  }
-
-  const remaining = data.items.filter((item) => item.id !== removed.id)
-  const roots = rootsForList({ ...data, items: remaining }, removed.listId)
-  const rootIndexes = new Map(roots.map((root, index) => [root.id, index]))
+  const queueIndex = new Map(
+    subtasks.map((item, index) => [item.id, index + 1]),
+  )
+  const rootDone = subtasks.length > 0 && subtasks.every((item) => item.done)
   return {
     ...data,
-    items: remaining.map((item) => {
-      const root = queueRootForItem({ ...data, items: remaining }, item)
-      const index = rootIndexes.get(root.id)
-      return index === undefined ? item : { ...item, index }
-    }),
+    items: data.items
+      .filter((item) => item.id !== removed.id)
+      .map((item) => {
+        if (item.id === removed.queueRootId && subtasks.length > 0) {
+          return {
+            ...item,
+            done: rootDone,
+            completedAt: rootDone ? now.toISOString() : undefined,
+          }
+        }
+        const index = queueIndex.get(item.id)
+        return index === undefined ? item : { ...item, queueIndex: index }
+      }),
   }
 }
 
@@ -398,7 +383,7 @@ export function deleteTodoQueue(
   const item = data.items.find((candidate) => candidate.id === input.id)
   if (!item) return data
   const root = queueRootForItem(data, item)
-  const queueIds = new Set(queueMembersForRoot(data, root).map((member) => member.id))
+  const queueIds = new Set([root.id, ...subtasksForRoot(data, root).map((subtask) => subtask.id)])
   const remaining = data.items.filter((candidate) => !queueIds.has(candidate.id))
   const nextData = { ...data, items: remaining }
   const roots = rootsForList(nextData, root.listId)
@@ -410,6 +395,19 @@ export function deleteTodoQueue(
       const index = rootIndexes.get(candidateRoot.id)
       return index === undefined ? candidate : { ...candidate, index }
     }),
+  }
+}
+
+export function deleteTodoSubtasks(
+  data: TodoData,
+  input: { id: string },
+): TodoData {
+  const item = data.items.find((candidate) => candidate.id === input.id)
+  if (!item) return data
+  const root = queueRootForItem(data, item)
+  return {
+    ...data,
+    items: data.items.filter((candidate) => candidate.queueRootId !== root.id),
   }
 }
 
@@ -490,7 +488,7 @@ export function sortListItems(
   )
 
   const rootIndexes = new Map(
-    keyed.map((entry, index) => [entry.item.anchorId, index]),
+    keyed.map((entry, index) => [entry.item.id, index]),
   )
 
   return {
@@ -513,18 +511,11 @@ export function movePastTodoItems(
 ): TodoData {
   const todayId = formatDateId(now)
 
-  const roots = data.items.filter(
-    (item) => queueRootForItem(data, item).id === item.id,
-  )
+  const roots = data.items.filter((item) => !item.queueRootId)
   const toMove = sortByIndex(
-    roots.filter((root) => {
-      const queue = getTodoQueue(data, root.id)
-      return (
-        isListInThePast(root.listId, now) &&
-        queue?.current.done === false &&
-        !root.fixed
-      )
-    }),
+    roots.filter(
+      (root) => isListInThePast(root.listId, now) && !root.done && !root.fixed,
+    ),
   )
   if (toMove.length === 0) return data
 

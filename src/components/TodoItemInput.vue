@@ -11,7 +11,7 @@ const props = withDefaults(
     listId: string
     mode?: 'add' | 'edit'
     editItem?: TodoItem
-    followUpFor?: string
+    subtaskFor?: string
   }>(),
   { mode: 'add' },
 )
@@ -96,7 +96,7 @@ const placeholder = computed(() => {
   if (inputMode.value === 'tag') return 'tag… (Enter to seal)'
   if (inputMode.value === 'date') return '明天 / 周五 / 6/20…'
   if (tags.value.length) return 'what to do…'
-  return props.followUpFor ? '添加后续任务…' : 'Add todo…'
+  return props.subtaskFor ? '添加子任务…' : 'Add todo…'
 })
 
 // Urgency bucket for the sealed deadline chip, mirroring TodoItem's due badge.
@@ -441,9 +441,9 @@ function submit(): void {
   // Add mode: nothing to add unless there are tags or some text (a bare deadline
   // alone isn't enough on its own).
   if (tags.value.length === 0 && finalText === '') return
-  if (props.followUpFor) {
-    store.addFollowUp({
-      afterId: props.followUpFor,
+  if (props.subtaskFor) {
+    store.addSubtask({
+      rootId: props.subtaskFor,
       tags: tags.value,
       text: finalText,
       due: finalDue,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import type { ResolvedTodoItem, TodoItem } from '../types/todo'
+import type { TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useTagFilter } from '../composables/useTagFilter'
 import { useNotes } from '../composables/useNotes'
@@ -13,7 +13,7 @@ import TodoItemInput from './TodoItemInput.vue'
 import { useSelection } from '../composables/useSelection'
 import { useToast } from '../composables/useToast'
 
-const props = defineProps<{ item: ResolvedTodoItem; focusable?: boolean }>()
+const props = defineProps<{ item: TodoItem; focusable?: boolean }>()
 
 const store = useTodoStore()
 const { activeTag, toggle: toggleTag } = useTagFilter()
@@ -22,17 +22,18 @@ const focusSession = useFocusSession()
 const selection = useSelection()
 const { showToast } = useToast()
 
-const queue = computed(() => store.queueFor(props.item.anchorId))
-const hasQueue = computed(() => (queue.value?.total ?? 0) > 1)
+const queue = computed(() => store.queueFor(props.item.id))
+const hasQueue = computed(() => (queue.value?.total ?? 0) > 0)
 const expanded = ref(false)
-const addingFollowUp = ref(false)
-const followUpAdder = ref<InstanceType<typeof TodoItemInput> | null>(null)
+const addingSubtask = ref(false)
+const editingSubtaskId = ref<string | null>(null)
+const subtaskAdder = ref<InstanceType<typeof TodoItemInput> | null>(null)
 
-async function startAddingFollowUp(): Promise<void> {
+async function startAddingSubtask(): Promise<void> {
   expanded.value = true
-  addingFollowUp.value = true
+  addingSubtask.value = true
   await nextTick()
-  followUpAdder.value?.focus()
+  subtaskAdder.value?.focus()
 }
 
 function toggleQueue(): void {
@@ -41,7 +42,12 @@ function toggleQueue(): void {
 
 function onQueueControl(): void {
   if (hasQueue.value) toggleQueue()
-  else void startAddingFollowUp()
+  else void startAddingSubtask()
+}
+
+function startEditingSubtask(item: TodoItem): void {
+  addingSubtask.value = false
+  editingSubtaskId.value = item.id
 }
 
 // Click a task once to select it (highlight), again to edit it — a two-step
@@ -85,28 +91,27 @@ const dimmed = computed(
 const editing = ref(false)
 
 function onToggle(): void {
-  const nextId = store.checkItem({ id: props.item.id, done: !props.item.done })
-  if (!props.item.done && nextId && nextId !== props.item.id) {
-    selection.select(nextId)
-    const next = store.state.items.find((item) => item.id === nextId)
+  store.checkItem({ id: props.item.id, done: !props.item.done })
+}
+
+function toggleSubtask(item: TodoItem): void {
+  const nextId = store.checkItem({ id: item.id, done: !item.done })
+  if (!item.done && nextId) {
+    const next = store.state.items.find((candidate) => candidate.id === nextId)
     if (next) showToast(`下一项：${labelText(next)}`)
+  } else if (!item.done && !nextId) {
+    showToast('所有子任务已完成')
   }
 }
 
-function toggleQueueItem(item: TodoItem): void {
-  const nextId = store.checkItem({ id: item.id, done: !item.done })
-  if (!item.done && nextId && nextId !== item.id) selection.select(nextId)
-}
-
-function removeQueueItem(item: TodoItem): void {
+function removeSubtask(item: TodoItem): void {
   store.deleteItem({ id: item.id })
-  showToast('已删除队列步骤 · ⌘Z 撤销')
+  showToast('已删除子任务 · ⌘Z 撤销')
 }
 
-function removeWholeQueue(): void {
-  store.deleteQueue({ id: props.item.id })
-  selection.clear()
-  showToast('已删除整条任务队列 · ⌘Z 撤销')
+function removeAllSubtasks(): void {
+  store.deleteSubtasks({ id: props.item.id })
+  showToast('已删除全部子任务 · ⌘Z 撤销')
 }
 
 // The shared tag-aware input drives editing too (mode="edit"); it auto-focuses
@@ -217,14 +222,14 @@ function closeMenu(): void {
         class="todo-item__queue-badge"
         :class="{ '-open': expanded, '-empty': !hasQueue }"
         type="button"
-        :title="hasQueue ? (expanded ? '收起任务队列' : '展开任务队列') : '添加后续任务'"
+        :title="hasQueue ? (expanded ? '收起子任务' : '展开子任务') : '添加子任务'"
         @click.stop="onQueueControl"
       >
         <template v-if="hasQueue">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h8M5 8h8M5 12h8"/><circle cx="2.5" cy="4" r=".7"/><circle cx="2.5" cy="8" r=".7"/><circle cx="2.5" cy="12" r=".7"/></svg>
           {{ queue?.completed }}/{{ queue?.total }}
         </template>
-        <template v-else>＋ 后续</template>
+        <template v-else>＋ 子任务</template>
       </button>
 
       <button
@@ -281,14 +286,14 @@ function closeMenu(): void {
 
     <section v-if="expanded" class="todo-item-queue">
       <header class="todo-item-queue__head">
-        <span>任务队列</span>
+        <span>子任务</span>
         <span v-if="queue" class="todo-item-queue__progress">已完成 {{ queue.completed }}/{{ queue.total }}</span>
         <button
           v-if="hasQueue"
           class="todo-item-queue__delete-all"
           type="button"
-          title="删除整条队列"
-          @click.stop="removeWholeQueue"
+          title="删除全部子任务"
+          @click.stop="removeAllSubtasks"
         >删除全部</button>
       </header>
 
@@ -297,17 +302,36 @@ function closeMenu(): void {
           v-for="(step, index) in queue.items"
           :key="step.id"
           class="todo-item-queue__step"
-          :class="{ '-done': step.done, '-current': queue.current.id === step.id }"
+          :class="{ '-done': step.done, '-current': queue.current?.id === step.id }"
         >
-          <button
-            class="todo-item-queue__check"
-            type="button"
-            role="checkbox"
-            :aria-checked="step.done"
-            @click.stop="toggleQueueItem(step)"
-          ><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" /></svg></button>
-          <span class="todo-item-queue__order">{{ index + 1 }}</span>
-          <span class="todo-item-queue__label" :title="labelText(step)"><template
+          <template v-if="editingSubtaskId === step.id">
+            <span class="todo-item-queue__edit-spacer" />
+            <span class="todo-item-queue__order">{{ index + 1 }}</span>
+            <TodoItemInput
+              class="todo-item-queue__editor"
+              mode="edit"
+              :list-id="step.listId"
+              :edit-item="step"
+              @done="editingSubtaskId = null"
+            />
+          </template>
+          <template v-else>
+            <button
+              class="todo-item-queue__check"
+              type="button"
+              role="checkbox"
+              :aria-checked="step.done"
+              @click.stop="toggleSubtask(step)"
+            ><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" /></svg></button>
+            <span class="todo-item-queue__order">{{ index + 1 }}</span>
+            <span
+              class="todo-item-queue__label"
+              role="button"
+              tabindex="0"
+              :title="`点击修改：${labelText(step)}`"
+              @click.stop="startEditingSubtask(step)"
+              @keydown.enter.stop.prevent="startEditingSubtask(step)"
+            ><template
               v-for="(tag, tagIndex) in step.tags"
               :key="`queue-tag-${tagIndex}`"
             ><span
@@ -326,34 +350,35 @@ function closeMenu(): void {
                 class="time-chip"
                 :class="{ '-cross': segment.time?.crossMidnight }"
               >{{ segment.text }}</span><span
-                v-else-if="segment.text.trim()"
-                class="todo-item-queue__text"
-              >{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span>
-          <span v-if="queue.current.id === step.id && !step.done" class="todo-item-queue__now">当前</span>
-          <button
-            v-if="queue.total > 1"
-            class="todo-item-queue__remove"
-            type="button"
-            title="删除此步骤"
-            @click.stop="removeQueueItem(step)"
-          >×</button>
+              v-else-if="segment.text.trim()"
+              class="todo-item-queue__text"
+            >{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span>
+            <span v-if="queue.current?.id === step.id && !step.done" class="todo-item-queue__now">当前</span>
+            <button
+              v-if="queue.total > 1"
+              class="todo-item-queue__remove"
+              type="button"
+              title="删除此步骤"
+              @click.stop="removeSubtask(step)"
+            >×</button>
+          </template>
         </li>
       </ol>
 
       <TodoItemInput
-        v-if="addingFollowUp"
-        ref="followUpAdder"
+        v-if="addingSubtask"
+        ref="subtaskAdder"
         class="todo-item-queue__adder"
         :list-id="item.listId"
-        :follow-up-for="item.id"
-        @blur-empty="addingFollowUp = false"
+        :subtask-for="item.id"
+        @blur-empty="addingSubtask = false"
       />
       <button
         v-else
         class="todo-item-queue__add"
         type="button"
-        @click.stop="startAddingFollowUp"
-      >＋ 添加后续任务</button>
+        @click.stop="startAddingSubtask"
+      >＋ 添加子任务</button>
     </section>
   </div>
 </template>
@@ -784,12 +809,33 @@ function closeMenu(): void {
   text-align: center;
 }
 
+.todo-item-queue__edit-spacer {
+  flex: 0 0 auto;
+  width: 0.95rem;
+}
+
+.todo-item-queue__editor {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.todo-item-queue__editor :deep(.todo-item-input__bullet) {
+  display: none;
+}
+
 .todo-item-queue__label {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: text;
+}
+
+.todo-item-queue__label:hover,
+.todo-item-queue__label:focus-visible {
+  color: var(--highlight-text);
+  outline: none;
 }
 
 .todo-item-queue__label .tag-chip,

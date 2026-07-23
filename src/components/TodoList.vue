@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import draggable from 'vuedraggable'
-import type { ResolvedTodoItem } from '../types/todo'
+import type { TodoItem as TodoItemType } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { usePreferences } from '../composables/usePreferences'
 import TodoItem from './TodoItem.vue'
 import TodoItemInput from './TodoItemInput.vue'
 
-const props = defineProps<{ listId: string; items: ResolvedTodoItem[]; focusable?: boolean }>()
+const props = defineProps<{ listId: string; items: TodoItemType[]; focusable?: boolean }>()
 
 const store = useTodoStore()
 const { prefs } = usePreferences()
@@ -32,7 +32,7 @@ function onEmptyClick(e: MouseEvent): void {
 // Items to render: completed sink to the bottom; everything else keeps its manual
 // (drag / keyboard) order — no time-based auto-sort. Completed can also be hidden
 // entirely via Preferences.
-const source = computed<ResolvedTodoItem[]>(() => {
+const source = computed<TodoItemType[]>(() => {
   const items = prefs.showCompleted ? props.items : props.items.filter((i) => !i.done)
   return [...items].sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1
@@ -41,7 +41,7 @@ const source = computed<ResolvedTodoItem[]>(() => {
 })
 
 // Local writable copy bound to <draggable>, kept in sync with incoming items.
-const localItems = ref<ResolvedTodoItem[]>([...source.value])
+const localItems = ref<TodoItemType[]>([...source.value])
 
 watch(
   source,
@@ -52,8 +52,8 @@ watch(
 )
 
 interface DragChangeEvent {
-  added?: { element: ResolvedTodoItem; newIndex: number }
-  moved?: { element: ResolvedTodoItem; newIndex: number }
+  added?: { element: TodoItemType; newIndex: number }
+  moved?: { element: TodoItemType; newIndex: number }
 }
 
 function onChange(event: DragChangeEvent) {
@@ -74,7 +74,7 @@ function onChange(event: DragChangeEvent) {
       v-model="localItems"
       class="todo-list__items"
       group="todo-items"
-      item-key="anchorId"
+      item-key="id"
       handle=".todo-item__label"
       :animation="150"
       ghost-class="todo-list__ghost"

@@ -1,7 +1,7 @@
 import { reactive, computed, type ComputedRef } from 'vue'
 import type {
   TodoData,
-  ResolvedTodoItem,
+  TodoItem,
   DayList,
   ResolvedCustomList,
   TodoQueue,
@@ -12,12 +12,12 @@ import {
   itemsForList,
   getTodoQueue,
   addTodoItem,
-  addFollowUpTodoItem,
+  addTodoSubtask,
   checkTodoItem,
   editTodoItem,
   moveTodoItem,
   deleteTodoItem,
-  deleteTodoQueue,
+  deleteTodoSubtasks,
   sortListItems,
   movePastTodoItems,
   getCustomTodoLists,
@@ -38,16 +38,16 @@ export interface TodoStore {
   state: TodoData
   days: ComputedRef<DayList[]>
   customLists: ComputedRef<ResolvedCustomList[]>
-  inboxItems: ComputedRef<ResolvedTodoItem[]>
-  itemsFor(listId: string): ResolvedTodoItem[]
+  inboxItems: ComputedRef<TodoItem[]>
+  itemsFor(listId: string): TodoItem[]
   queueFor(itemId: string): TodoQueue | null
   addItem(input: { listId: string; tags: string[]; text: string; due?: string }): void
-  addFollowUp(input: { afterId: string; tags: string[]; text: string; due?: string }): void
+  addSubtask(input: { rootId: string; tags: string[]; text: string; due?: string }): void
   checkItem(input: { id: string; done: boolean }): string | null
   editItem(input: { id: string; tags: string[]; text: string; due?: string }): void
   moveItem(input: { id: string; listId: string; index: number }): void
   deleteItem(input: { id: string }): void
-  deleteQueue(input: { id: string }): void
+  deleteSubtasks(input: { id: string }): void
   sortList(input: { listId: string }): void
   undoDelete(): string | null
   addCustomList(): void
@@ -81,11 +81,11 @@ function createStore(): TodoStore {
     getCustomTodoLists(state as TodoData),
   )
 
-  const inboxItems = computed<ResolvedTodoItem[]>(() =>
+  const inboxItems = computed<TodoItem[]>(() =>
     itemsForList(state as TodoData, INBOX_LIST_ID),
   )
 
-  function itemsFor(listId: string): ResolvedTodoItem[] {
+  function itemsFor(listId: string): TodoItem[] {
     return itemsForList(state as TodoData, listId)
   }
 
@@ -97,13 +97,13 @@ function createStore(): TodoStore {
     apply(addTodoItem(state as TodoData, input))
   }
 
-  function addFollowUp(input: { afterId: string; tags: string[]; text: string; due?: string }): void {
-    apply(addFollowUpTodoItem(state as TodoData, input))
+  function addSubtask(input: { rootId: string; tags: string[]; text: string; due?: string }): void {
+    apply(addTodoSubtask(state as TodoData, input))
   }
 
   function checkItem(input: { id: string; done: boolean }): string | null {
     apply(checkTodoItem(state as TodoData, input))
-    return getTodoQueue(state as TodoData, input.id)?.current.id ?? null
+    return getTodoQueue(state as TodoData, input.id)?.current?.id ?? null
   }
 
   function editItem(input: { id: string; tags: string[]; text: string; due?: string }): void {
@@ -120,10 +120,10 @@ function createStore(): TodoStore {
     apply(deleteTodoItem(state as TodoData, input))
   }
 
-  function deleteQueue(input: { id: string }): void {
+  function deleteSubtasks(input: { id: string }): void {
     undoStack.push({ snapshot: JSON.parse(JSON.stringify(state)) as TodoData, id: input.id })
     if (undoStack.length > 25) undoStack.shift()
-    apply(deleteTodoQueue(state as TodoData, input))
+    apply(deleteTodoSubtasks(state as TodoData, input))
   }
 
   // One-shot "整理": re-sort a day's list once. Not undoable (it only reorders;
@@ -205,12 +205,12 @@ function createStore(): TodoStore {
     itemsFor,
     queueFor,
     addItem,
-    addFollowUp,
+    addSubtask,
     checkItem,
     editItem,
     moveItem,
     deleteItem,
-    deleteQueue,
+    deleteSubtasks,
     sortList,
     undoDelete,
     addCustomList,

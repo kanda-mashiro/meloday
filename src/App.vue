@@ -224,14 +224,7 @@ function toggleSelectedDone(): boolean {
       break;
     }
   }
-  const nextQueueId = store.checkItem({ id, done: nowDone });
-  // A queue head disappears from the rendered list even when completed items
-  // are shown, because the same anchored row immediately reveals its next step.
-  // Follow that new step before applying the ordinary hide-completed fallback.
-  if (nowDone && nextQueueId && nextQueueId !== id) {
-    selection.select(nextQueueId);
-    return true;
-  }
+  store.checkItem({ id, done: nowDone });
   if (nowDone && !prefs.showCompleted && di !== -1) {
     const after = visibleItems(store.itemsFor(days[di].id));
     if (after.length === 0) selection.clear();
