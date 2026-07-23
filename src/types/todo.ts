@@ -17,6 +17,26 @@ export interface TodoItem {
   fixed: boolean;
   /** Optional deadline (date-only, "YYYY-MM-DD"). Independent of which day list the item sits in. */
   due?: string;
+  /**
+   * Follow-up queue membership. Followers point at the original/root task;
+   * roots and ordinary standalone tasks leave this unset.
+   */
+  queueRootId?: string;
+  /** Stable execution order within a follow-up queue (followers start at 1). */
+  queueIndex?: number;
+}
+
+/** A list row resolved for rendering. The anchor stays stable as the queue head advances. */
+export interface ResolvedTodoItem extends TodoItem {
+  anchorId: string;
+}
+
+export interface TodoQueue {
+  rootId: string;
+  items: TodoItem[];
+  current: TodoItem;
+  completed: number;
+  total: number;
 }
 
 export interface CustomList {
@@ -38,12 +58,12 @@ export interface TodoData {
 export interface DayList {
   id: string;
   date: Date;
-  items: TodoItem[];
+  items: ResolvedTodoItem[];
   isToday: boolean;
   isPast: boolean;
 }
 
 /** A custom list resolved (with its items) for rendering. */
 export interface ResolvedCustomList extends CustomList {
-  items: TodoItem[];
+  items: ResolvedTodoItem[];
 }

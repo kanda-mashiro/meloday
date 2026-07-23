@@ -1,5 +1,6 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useTodoStore } from './useTodoStore'
+import { useSelection } from './useSelection'
 
 /** The task currently held in a focus session. */
 export interface FocusTarget {
@@ -73,7 +74,10 @@ function exit(): void {
 /** Mark the focused task done and leave the session. */
 function complete(): void {
   const t = target.value
-  if (t) useTodoStore().checkItem({ id: t.id, done: true })
+  if (t) {
+    const nextId = useTodoStore().checkItem({ id: t.id, done: true })
+    if (nextId && nextId !== t.id) useSelection().select(nextId)
+  }
   exit()
 }
 

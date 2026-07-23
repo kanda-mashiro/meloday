@@ -3,7 +3,9 @@ import type {
   CustomList,
   TodoData,
   DayList,
+  ResolvedTodoItem,
   ResolvedCustomList,
+  TodoQueue,
 } from '../types/todo'
 import { uuid } from './uuid'
 import { formatDateId } from './date'
@@ -22,6 +24,50 @@ export function setIndexes<T extends { index: number }>(arr: T[]): T[] {
 /** Sort a shallow copy ascending by index. */
 function sortByIndex<T extends { index: number }>(arr: T[]): T[] {
   return [...arr].sort((a, b) => a.index - b.index)
+}
+
+function queueRootForItem(data: TodoData, item: TodoItem): TodoItem {
+  if (!item.queueRootId) return item
+  return data.items.find((candidate) => candidate.id === item.queueRootId) ?? item
+}
+
+function queueMembersForRoot(data: TodoData, root: TodoItem): TodoItem[] {
+  const followers = data.items
+    .filter((item) => item.queueRootId === root.id)
+    .sort(
+      (a, b) =>
+        (a.queueIndex ?? Number.MAX_SAFE_INTEGER) -
+          (b.queueIndex ?? Number.MAX_SAFE_INTEGER) ||
+        a.index - b.index,
+    )
+  return [root, ...followers]
+}
+
+function rootsForList(data: TodoData, listId: string): TodoItem[] {
+  return sortByIndex(
+    data.items.filter((item) => {
+      if (item.listId !== listId) return false
+      if (!item.queueRootId) return true
+      // A missing root should not make the task disappear forever. Treat an
+      // orphaned follower as a standalone row until sync repairs the chain.
+      return !data.items.some((candidate) => candidate.id === item.queueRootId)
+    }),
+  )
+}
+
+export function getTodoQueue(data: TodoData, itemId: string): TodoQueue | null {
+  const item = data.items.find((candidate) => candidate.id === itemId)
+  if (!item) return null
+  const root = queueRootForItem(data, item)
+  const items = queueMembersForRoot(data, root)
+  const current = items.find((candidate) => !candidate.done) ?? root
+  return {
+    rootId: root.id,
+    items,
+    current,
+    completed: items.filter((candidate) => candidate.done).length,
+    total: items.length,
+  }
 }
 
 /** Add `delta` days to a date and return a new Date. */
@@ -55,8 +101,20 @@ export function isListInThePast(listId: string, now: Date = new Date()): boolean
   return listId < formatDateId(now)
 }
 
-export function itemsForList(data: TodoData, listId: string): TodoItem[] {
-  return sortByIndex(data.items.filter((item) => item.listId === listId))
+export function itemsForList(data: TodoData, listId: string): ResolvedTodoItem[] {
+  return rootsForList(data, listId).map((root) => {
+    const queue = getTodoQueue(data, root.id)
+    const current = queue?.current ?? root
+    return {
+      ...current,
+      // The root owns board placement. Keeping a stable anchor lets Vue retain
+      // the same row/component when completing one step reveals the next.
+      anchorId: root.id,
+      listId: root.listId,
+      index: root.index,
+      fixed: root.fixed,
+    }
+  })
 }
 
 /**
@@ -99,7 +157,7 @@ export function addTodoItem(
   input: { listId: string; tags: string[]; text: string; due?: string },
   now: Date = new Date()
 ): TodoData {
-  const existing = data.items.filter((item) => item.listId === input.listId)
+  const existing = rootsForList(data, input.listId)
   const maxIndex = existing.reduce((max, item) => Math.max(max, item.index), -1)
 
   const newItem: TodoItem = {
@@ -111,6 +169,39 @@ export function addTodoItem(
     done: false,
     fixed: isListInThePast(input.listId, now),
     // Carry the optional inline deadline through; omitted when absent.
+    ...(input.due ? { due: input.due } : {}),
+  }
+
+  return {
+    ...data,
+    items: [...data.items, newItem],
+  }
+}
+
+export function addFollowUpTodoItem(
+  data: TodoData,
+  input: { afterId: string; tags: string[]; text: string; due?: string },
+  now: Date = new Date(),
+): TodoData {
+  const after = data.items.find((item) => item.id === input.afterId)
+  if (!after) return data
+  const root = queueRootForItem(data, after)
+  const members = queueMembersForRoot(data, root)
+  const maxQueueIndex = members.reduce(
+    (max, item) => Math.max(max, item.queueIndex ?? 0),
+    0,
+  )
+
+  const newItem: TodoItem = {
+    id: uuid(),
+    listId: root.listId,
+    index: root.index,
+    tags: input.tags ?? [],
+    text: input.text ?? '',
+    done: false,
+    fixed: isListInThePast(root.listId, now),
+    queueRootId: root.id,
+    queueIndex: maxQueueIndex + 1,
     ...(input.due ? { due: input.due } : {}),
   }
 
@@ -165,35 +256,55 @@ export function moveTodoItem(
 ): TodoData {
   const moving = data.items.find((item) => item.id === input.id)
   if (!moving) return data
+  const movingRoot = queueRootForItem(data, moving)
+  const sourceListId = movingRoot.listId
 
-  // Everything that isn't the moving item and isn't in the target list.
-  // The id guard matters for cross-list moves, where the moving item still
-  // carries its old listId and would otherwise be duplicated.
-  const others = data.items.filter(
-    (item) => item.listId !== input.listId && item.id !== input.id
+  const targetRoots = rootsForList(data, input.listId).filter(
+    (root) => root.id !== movingRoot.id,
   )
+  const clamped = Math.max(0, Math.min(input.index, targetRoots.length))
+  targetRoots.splice(clamped, 0, movingRoot)
 
-  // Current target-list items (excluding the moving one), in order.
-  const target = sortByIndex(
-    data.items.filter(
-      (item) => item.listId === input.listId && item.id !== input.id
-    )
-  )
+  const placements = new Map<
+    string,
+    { listId: string; index: number; fixed: boolean }
+  >()
+  targetRoots.forEach((root, index) => {
+    placements.set(root.id, {
+      listId: input.listId,
+      index,
+      fixed:
+        root.id === movingRoot.id
+          ? isListInThePast(input.listId, now)
+          : root.fixed,
+    })
+  })
 
-  const updatedMoving: TodoItem = {
-    ...moving,
-    listId: input.listId,
-    fixed: isListInThePast(input.listId, now),
+  if (sourceListId !== input.listId) {
+    rootsForList(data, sourceListId)
+      .filter((root) => root.id !== movingRoot.id)
+      .forEach((root, index) => {
+        placements.set(root.id, {
+          listId: sourceListId,
+          index,
+          fixed: root.fixed,
+        })
+      })
   }
-
-  const clamped = Math.max(0, Math.min(input.index, target.length))
-  target.splice(clamped, 0, updatedMoving)
-
-  const reindexedTarget = setIndexes(target)
 
   return {
     ...data,
-    items: [...others, ...reindexedTarget],
+    items: data.items.map((item) => {
+      const root = queueRootForItem(data, item)
+      const placement = placements.get(root.id)
+      if (!placement) return item
+      return {
+        ...item,
+        listId: placement.listId,
+        index: placement.index,
+        fixed: placement.fixed,
+      }
+    }),
   }
 }
 
@@ -204,17 +315,101 @@ export function deleteTodoItem(
   const removed = data.items.find((item) => item.id === input.id)
   if (!removed) return data
 
-  const remaining = data.items.filter((item) => item.id !== input.id)
+  // Removing a follower keeps the root and compacts the remaining queue order.
+  if (removed.queueRootId) {
+    const followers = data.items
+      .filter(
+        (item) =>
+          item.queueRootId === removed.queueRootId && item.id !== removed.id,
+      )
+      .sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0))
+    const queueIndex = new Map(
+      followers.map((item, index) => [item.id, index + 1]),
+    )
+    return {
+      ...data,
+      items: data.items
+        .filter((item) => item.id !== removed.id)
+        .map((item) => {
+          const index = queueIndex.get(item.id)
+          return index === undefined ? item : { ...item, queueIndex: index }
+        }),
+    }
+  }
 
-  // Reindex the affected list to keep index integrity.
-  const affected = setIndexes(
-    sortByIndex(remaining.filter((item) => item.listId === removed.listId))
-  )
-  const untouched = remaining.filter((item) => item.listId !== removed.listId)
+  const followers = data.items
+    .filter((item) => item.queueRootId === removed.id)
+    .sort((a, b) => (a.queueIndex ?? 0) - (b.queueIndex ?? 0))
 
+  // Deleting a root step promotes its first follower so the rest of the queue
+  // survives in the same board slot instead of being orphaned or disappearing.
+  if (followers.length > 0) {
+    const promoted = followers[0]
+    const remainingFollowers = followers.slice(1)
+    const queueIndex = new Map(
+      remainingFollowers.map((item, index) => [item.id, index + 1]),
+    )
+    return {
+      ...data,
+      items: data.items
+        .filter((item) => item.id !== removed.id)
+        .map((item) => {
+          if (item.id === promoted.id) {
+            const next: TodoItem = {
+              ...item,
+              listId: removed.listId,
+              index: removed.index,
+              fixed: removed.fixed,
+            }
+            delete next.queueRootId
+            delete next.queueIndex
+            return next
+          }
+          if (item.queueRootId !== removed.id) return item
+          return {
+            ...item,
+            queueRootId: promoted.id,
+            queueIndex: queueIndex.get(item.id) ?? item.queueIndex,
+            listId: removed.listId,
+            index: removed.index,
+            fixed: removed.fixed,
+          }
+        }),
+    }
+  }
+
+  const remaining = data.items.filter((item) => item.id !== removed.id)
+  const roots = rootsForList({ ...data, items: remaining }, removed.listId)
+  const rootIndexes = new Map(roots.map((root, index) => [root.id, index]))
   return {
     ...data,
-    items: [...untouched, ...affected],
+    items: remaining.map((item) => {
+      const root = queueRootForItem({ ...data, items: remaining }, item)
+      const index = rootIndexes.get(root.id)
+      return index === undefined ? item : { ...item, index }
+    }),
+  }
+}
+
+export function deleteTodoQueue(
+  data: TodoData,
+  input: { id: string },
+): TodoData {
+  const item = data.items.find((candidate) => candidate.id === input.id)
+  if (!item) return data
+  const root = queueRootForItem(data, item)
+  const queueIds = new Set(queueMembersForRoot(data, root).map((member) => member.id))
+  const remaining = data.items.filter((candidate) => !queueIds.has(candidate.id))
+  const nextData = { ...data, items: remaining }
+  const roots = rootsForList(nextData, root.listId)
+  const rootIndexes = new Map(roots.map((candidate, index) => [candidate.id, index]))
+  return {
+    ...nextData,
+    items: remaining.map((candidate) => {
+      const candidateRoot = queueRootForItem(nextData, candidate)
+      const index = rootIndexes.get(candidateRoot.id)
+      return index === undefined ? candidate : { ...candidate, index }
+    }),
   }
 }
 
@@ -294,12 +489,17 @@ export function sortListItems(
       a.originalIndex - b.originalIndex,
   )
 
-  const reindexed = setIndexes(keyed.map((k) => k.item))
-  const untouched = data.items.filter((item) => item.listId !== listId)
+  const rootIndexes = new Map(
+    keyed.map((entry, index) => [entry.item.anchorId, index]),
+  )
 
   return {
     ...data,
-    items: [...untouched, ...reindexed],
+    items: data.items.map((item) => {
+      const root = queueRootForItem(data, item)
+      const index = rootIndexes.get(root.id)
+      return index === undefined ? item : { ...item, index }
+    }),
   }
 }
 
@@ -313,29 +513,42 @@ export function movePastTodoItems(
 ): TodoData {
   const todayId = formatDateId(now)
 
+  const roots = data.items.filter(
+    (item) => queueRootForItem(data, item).id === item.id,
+  )
   const toMove = sortByIndex(
-    data.items.filter(
-      (item) =>
-        isListInThePast(item.listId, now) && !item.done && !item.fixed
-    )
+    roots.filter((root) => {
+      const queue = getTodoQueue(data, root.id)
+      return (
+        isListInThePast(root.listId, now) &&
+        queue?.current.done === false &&
+        !root.fixed
+      )
+    }),
   )
   if (toMove.length === 0) return data
 
-  const untouched = data.items.filter((item) => !toMove.includes(item))
-
-  const todayItems = sortByIndex(
-    untouched.filter((item) => item.listId === todayId)
+  const movingRootIds = new Set(toMove.map((root) => root.id))
+  const todayRoots = rootsForList(data, todayId).filter(
+    (root) => !movingRootIds.has(root.id),
   )
-  const rest = untouched.filter((item) => item.listId !== todayId)
-
-  const merged = setIndexes([
-    ...todayItems,
-    ...toMove.map((item) => ({ ...item, listId: todayId, fixed: false })),
-  ])
+  const todayOrder = new Map(
+    [...todayRoots, ...toMove].map((root, index) => [root.id, index]),
+  )
 
   return {
     ...data,
-    items: [...rest, ...merged],
+    items: data.items.map((item) => {
+      const root = queueRootForItem(data, item)
+      const index = todayOrder.get(root.id)
+      if (index === undefined) return item
+      return {
+        ...item,
+        listId: todayId,
+        index,
+        fixed: false,
+      }
+    }),
   }
 }
 
@@ -367,22 +580,33 @@ export function partitionForArchive(
   const kept: TodoItem[] = []
   let changed = false
 
-  for (const item of data.items) {
-    if (!item.done) {
-      kept.push(item)
-      continue
-    }
-    // Backfill legacy completed items so they can age from "now".
-    let normalized = item
-    if (!item.completedAt) {
-      normalized = { ...item, completedAt: nowIso }
-      changed = true
-    }
-    if (new Date(normalized.completedAt as string).getTime() <= cutoffMs) {
-      archived.push(normalized)
+  const normalizedItems = data.items.map((item) => {
+    if (!item.done || item.completedAt) return item
+    changed = true
+    return { ...item, completedAt: nowIso }
+  })
+  const normalizedData = { ...data, items: normalizedItems }
+  const groups = new Map<string, TodoItem[]>()
+  for (const item of normalizedItems) {
+    const root = queueRootForItem(normalizedData, item)
+    const group = groups.get(root.id) ?? []
+    group.push(item)
+    groups.set(root.id, group)
+  }
+
+  for (const group of groups.values()) {
+    // Queue members archive together. Keeping the root while any follower is
+    // active prevents old completed heads from leaving orphaned live steps.
+    const eligible = group.every(
+      (item) =>
+        item.done &&
+        new Date(item.completedAt as string).getTime() <= cutoffMs,
+    )
+    if (eligible) {
+      archived.push(...group)
       changed = true
     } else {
-      kept.push(normalized)
+      kept.push(...group)
     }
   }
 

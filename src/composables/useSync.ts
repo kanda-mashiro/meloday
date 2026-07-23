@@ -26,6 +26,8 @@ interface ItemRow {
   fixed: boolean
   completed_at: string | null
   due: string | null
+  queue_root_id: string | null
+  queue_idx: number | null
   deleted_at: string | null
   updated_at: string
 }
@@ -98,6 +100,8 @@ function rowToItem(r: ItemRow): TodoItem {
     // `due` is a timestamptz column but the app treats deadlines as date-only —
     // take just the calendar day (slice "YYYY-MM-DD") off the returned ISO.
     due: r.due ? r.due.slice(0, 10) : undefined,
+    queueRootId: r.queue_root_id ?? undefined,
+    queueIndex: r.queue_idx ?? undefined,
   }
 }
 function itemToRow(it: TodoItem, uid: string, ts: number, deleted: boolean): ItemRow {
@@ -114,6 +118,8 @@ function itemToRow(it: TodoItem, uid: string, ts: number, deleted: boolean): Ite
     // Store the date-only deadline as explicit UTC midnight so the calendar day
     // round-trips regardless of the DB/session timezone.
     due: it.due ? `${it.due}T00:00:00Z` : null,
+    queue_root_id: it.queueRootId ?? null,
+    queue_idx: it.queueIndex ?? null,
     deleted_at: deleted ? iso(ts) : null,
     updated_at: iso(ts),
   }
@@ -354,6 +360,8 @@ function init(): void {
           fixed: false,
           completed_at: null,
           due: null,
+          queue_root_id: null,
+          queue_idx: null,
           deleted_at: iso(ts),
           updated_at: iso(ts),
         })

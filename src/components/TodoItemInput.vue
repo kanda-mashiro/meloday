@@ -7,7 +7,12 @@ import { tagHue, priorityLevel, topPriority } from '../lib/tags'
 import { parseDue, dueRelative, dueUrgency } from '../lib/due'
 
 const props = withDefaults(
-  defineProps<{ listId: string; mode?: 'add' | 'edit'; editItem?: TodoItem }>(),
+  defineProps<{
+    listId: string
+    mode?: 'add' | 'edit'
+    editItem?: TodoItem
+    followUpFor?: string
+  }>(),
   { mode: 'add' },
 )
 const emit = defineEmits<{ blurEmpty: []; captured: []; done: [] }>()
@@ -90,7 +95,8 @@ watch(text, (val) => {
 const placeholder = computed(() => {
   if (inputMode.value === 'tag') return 'tag… (Enter to seal)'
   if (inputMode.value === 'date') return '明天 / 周五 / 6/20…'
-  return tags.value.length ? 'what to do…' : 'Add todo…'
+  if (tags.value.length) return 'what to do…'
+  return props.followUpFor ? '添加后续任务…' : 'Add todo…'
 })
 
 // Urgency bucket for the sealed deadline chip, mirroring TodoItem's due badge.
@@ -435,12 +441,21 @@ function submit(): void {
   // Add mode: nothing to add unless there are tags or some text (a bare deadline
   // alone isn't enough on its own).
   if (tags.value.length === 0 && finalText === '') return
-  store.addItem({
-    listId: props.listId,
-    tags: tags.value,
-    text: finalText,
-    due: finalDue,
-  })
+  if (props.followUpFor) {
+    store.addFollowUp({
+      afterId: props.followUpFor,
+      tags: tags.value,
+      text: finalText,
+      due: finalDue,
+    })
+  } else {
+    store.addItem({
+      listId: props.listId,
+      tags: tags.value,
+      text: finalText,
+      due: finalDue,
+    })
+  }
   tags.value = []
   text.value = ''
   due.value = null

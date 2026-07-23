@@ -1,19 +1,23 @@
 import { reactive, computed, type ComputedRef } from 'vue'
 import type {
   TodoData,
-  TodoItem,
+  ResolvedTodoItem,
   DayList,
   ResolvedCustomList,
+  TodoQueue,
 } from '../types/todo'
 import {
   initTodoData,
   getDayLists,
   itemsForList,
+  getTodoQueue,
   addTodoItem,
+  addFollowUpTodoItem,
   checkTodoItem,
   editTodoItem,
   moveTodoItem,
   deleteTodoItem,
+  deleteTodoQueue,
   sortListItems,
   movePastTodoItems,
   getCustomTodoLists,
@@ -34,13 +38,16 @@ export interface TodoStore {
   state: TodoData
   days: ComputedRef<DayList[]>
   customLists: ComputedRef<ResolvedCustomList[]>
-  inboxItems: ComputedRef<TodoItem[]>
-  itemsFor(listId: string): TodoItem[]
+  inboxItems: ComputedRef<ResolvedTodoItem[]>
+  itemsFor(listId: string): ResolvedTodoItem[]
+  queueFor(itemId: string): TodoQueue | null
   addItem(input: { listId: string; tags: string[]; text: string; due?: string }): void
-  checkItem(input: { id: string; done: boolean }): void
+  addFollowUp(input: { afterId: string; tags: string[]; text: string; due?: string }): void
+  checkItem(input: { id: string; done: boolean }): string | null
   editItem(input: { id: string; tags: string[]; text: string; due?: string }): void
   moveItem(input: { id: string; listId: string; index: number }): void
   deleteItem(input: { id: string }): void
+  deleteQueue(input: { id: string }): void
   sortList(input: { listId: string }): void
   undoDelete(): string | null
   addCustomList(): void
@@ -74,20 +81,29 @@ function createStore(): TodoStore {
     getCustomTodoLists(state as TodoData),
   )
 
-  const inboxItems = computed<TodoItem[]>(() =>
+  const inboxItems = computed<ResolvedTodoItem[]>(() =>
     itemsForList(state as TodoData, INBOX_LIST_ID),
   )
 
-  function itemsFor(listId: string): TodoItem[] {
+  function itemsFor(listId: string): ResolvedTodoItem[] {
     return itemsForList(state as TodoData, listId)
+  }
+
+  function queueFor(itemId: string): TodoQueue | null {
+    return getTodoQueue(state as TodoData, itemId)
   }
 
   function addItem(input: { listId: string; tags: string[]; text: string; due?: string }): void {
     apply(addTodoItem(state as TodoData, input))
   }
 
-  function checkItem(input: { id: string; done: boolean }): void {
+  function addFollowUp(input: { afterId: string; tags: string[]; text: string; due?: string }): void {
+    apply(addFollowUpTodoItem(state as TodoData, input))
+  }
+
+  function checkItem(input: { id: string; done: boolean }): string | null {
     apply(checkTodoItem(state as TodoData, input))
+    return getTodoQueue(state as TodoData, input.id)?.current.id ?? null
   }
 
   function editItem(input: { id: string; tags: string[]; text: string; due?: string }): void {
@@ -102,6 +118,12 @@ function createStore(): TodoStore {
     undoStack.push({ snapshot: JSON.parse(JSON.stringify(state)) as TodoData, id: input.id })
     if (undoStack.length > 25) undoStack.shift()
     apply(deleteTodoItem(state as TodoData, input))
+  }
+
+  function deleteQueue(input: { id: string }): void {
+    undoStack.push({ snapshot: JSON.parse(JSON.stringify(state)) as TodoData, id: input.id })
+    if (undoStack.length > 25) undoStack.shift()
+    apply(deleteTodoQueue(state as TodoData, input))
   }
 
   // One-shot "整理": re-sort a day's list once. Not undoable (it only reorders;
@@ -181,11 +203,14 @@ function createStore(): TodoStore {
     customLists,
     inboxItems,
     itemsFor,
+    queueFor,
     addItem,
+    addFollowUp,
     checkItem,
     editItem,
     moveItem,
     deleteItem,
+    deleteQueue,
     sortList,
     undoDelete,
     addCustomList,

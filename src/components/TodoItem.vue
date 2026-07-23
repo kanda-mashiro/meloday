@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import type { TodoItem } from '../types/todo'
+import { computed, nextTick, ref, watch } from 'vue'
+import type { ResolvedTodoItem, TodoItem } from '../types/todo'
 import { useTodoStore } from '../composables/useTodoStore'
 import { useTagFilter } from '../composables/useTagFilter'
 import { useNotes } from '../composables/useNotes'
@@ -13,7 +13,7 @@ import TodoItemInput from './TodoItemInput.vue'
 import { useSelection } from '../composables/useSelection'
 import { useToast } from '../composables/useToast'
 
-const props = defineProps<{ item: TodoItem; focusable?: boolean }>()
+const props = defineProps<{ item: ResolvedTodoItem; focusable?: boolean }>()
 
 const store = useTodoStore()
 const { activeTag, toggle: toggleTag } = useTagFilter()
@@ -21,6 +21,28 @@ const notes = useNotes()
 const focusSession = useFocusSession()
 const selection = useSelection()
 const { showToast } = useToast()
+
+const queue = computed(() => store.queueFor(props.item.anchorId))
+const hasQueue = computed(() => (queue.value?.total ?? 0) > 1)
+const expanded = ref(false)
+const addingFollowUp = ref(false)
+const followUpAdder = ref<InstanceType<typeof TodoItemInput> | null>(null)
+
+async function startAddingFollowUp(): Promise<void> {
+  expanded.value = true
+  addingFollowUp.value = true
+  await nextTick()
+  followUpAdder.value?.focus()
+}
+
+function toggleQueue(): void {
+  expanded.value = !expanded.value
+}
+
+function onQueueControl(): void {
+  if (hasQueue.value) toggleQueue()
+  else void startAddingFollowUp()
+}
 
 // Click a task once to select it (highlight), again to edit it — a two-step
 // like Finder, so a single stray click doesn't drop you into editing.
@@ -36,6 +58,9 @@ function startFocus(): void {
 
 // Time chips + plain text from the body; tags render separately from item.tags.
 const segments = computed(() => parseTextRich(props.item.text).segments)
+function segmentsOf(text: string) {
+  return parseTextRich(text).segments
+}
 // Highest priority tag on this task (p0 > p1 > p2) — drives the row accent.
 const priority = computed(() => topPriority(props.item.tags))
 
@@ -60,7 +85,28 @@ const dimmed = computed(
 const editing = ref(false)
 
 function onToggle(): void {
-  store.checkItem({ id: props.item.id, done: !props.item.done })
+  const nextId = store.checkItem({ id: props.item.id, done: !props.item.done })
+  if (!props.item.done && nextId && nextId !== props.item.id) {
+    selection.select(nextId)
+    const next = store.state.items.find((item) => item.id === nextId)
+    if (next) showToast(`下一项：${labelText(next)}`)
+  }
+}
+
+function toggleQueueItem(item: TodoItem): void {
+  const nextId = store.checkItem({ id: item.id, done: !item.done })
+  if (!item.done && nextId && nextId !== item.id) selection.select(nextId)
+}
+
+function removeQueueItem(item: TodoItem): void {
+  store.deleteItem({ id: item.id })
+  showToast('已删除队列步骤 · ⌘Z 撤销')
+}
+
+function removeWholeQueue(): void {
+  store.deleteQueue({ id: props.item.id })
+  selection.clear()
+  showToast('已删除整条任务队列 · ⌘Z 撤销')
 }
 
 // The shared tag-aware input drives editing too (mode="edit"); it auto-focuses
@@ -103,11 +149,12 @@ function closeMenu(): void {
 </script>
 
 <template>
-  <div
-    class="todo-item"
-    :class="[{ '-done': item.done, '-dim': dimmed, '-selected': selected }, priority ? `-prio-${priority}` : '']"
-    @contextmenu.prevent="openMenu($event)"
-  >
+  <div class="todo-item-shell" @click.stop>
+    <div
+      class="todo-item"
+      :class="[{ '-done': item.done, '-dim': dimmed, '-selected': selected }, priority ? `-prio-${priority}` : '']"
+      @contextmenu.prevent="openMenu($event)"
+    >
     <button
       v-if="!editing"
       class="todo-item__check"
@@ -157,68 +204,165 @@ function closeMenu(): void {
         class="todo-item__text"
       >{{ seg.text }}</span><template v-else>{{ seg.text }}</template></template></span>
 
-    <!-- Relative countdown badge: a quiet, human phrase whose color escalates
-         with urgency (overdue/today red, soon amber, later neutral). -->
-    <span v-if="item.due && !editing" class="todo-item__due" :class="dueClass">
-      <svg viewBox="0 0 16 16" class="todo-item__due-glyph" aria-hidden="true">
-        <circle cx="8" cy="8.5" r="5" />
-        <path d="M8 5.5v3l2 1.5" />
-      </svg>{{ dueLabel }}</span>
+      <!-- Relative countdown badge: a quiet, human phrase whose color escalates
+           with urgency (overdue/today red, soon amber, later neutral). -->
+      <span v-if="item.due && !editing" class="todo-item__due" :class="dueClass">
+        <svg viewBox="0 0 16 16" class="todo-item__due-glyph" aria-hidden="true">
+          <circle cx="8" cy="8.5" r="5" />
+          <path d="M8 5.5v3l2 1.5" />
+        </svg>{{ dueLabel }}</span>
 
-    <button
-      v-if="focusable && !editing"
-      class="todo-item__focus"
-      type="button"
-      title="专注做这件事"
-      aria-label="Focus"
-      @click.stop="startFocus"
-    >
-      <svg viewBox="0 0 16 16" class="todo-item__focus-glyph" aria-hidden="true">
-        <path d="M5 3.5l7 4.5-7 4.5z" />
-      </svg>
-    </button>
+      <button
+        v-if="!editing"
+        class="todo-item__queue-badge"
+        :class="{ '-open': expanded, '-empty': !hasQueue }"
+        type="button"
+        :title="hasQueue ? (expanded ? '收起任务队列' : '展开任务队列') : '添加后续任务'"
+        @click.stop="onQueueControl"
+      >
+        <template v-if="hasQueue">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h8M5 8h8M5 12h8"/><circle cx="2.5" cy="4" r=".7"/><circle cx="2.5" cy="8" r=".7"/><circle cx="2.5" cy="12" r=".7"/></svg>
+          {{ queue?.completed }}/{{ queue?.total }}
+        </template>
+        <template v-else>＋ 后续</template>
+      </button>
 
-    <button
-      v-if="!editing"
-      class="todo-item__note"
-      :class="{ '-has': hasNote }"
-      type="button"
-      :title="hasNote ? 'Open note' : 'Add note'"
-      aria-label="Note"
-      @click.stop="openNote"
-    >
-      <svg viewBox="0 0 16 16" class="todo-item__note-glyph" aria-hidden="true">
-        <rect x="3.5" y="2.5" width="9" height="11" rx="1.5" />
-        <path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" />
-      </svg>
-    </button>
+      <button
+        v-if="focusable && !editing"
+        class="todo-item__focus"
+        type="button"
+        title="专注做这件事"
+        aria-label="Focus"
+        @click.stop="startFocus"
+      >
+        <svg viewBox="0 0 16 16" class="todo-item__focus-glyph" aria-hidden="true">
+          <path d="M5 3.5l7 4.5-7 4.5z" />
+        </svg>
+      </button>
 
-    <button
-      v-if="!editing"
-      class="todo-item__delete"
-      type="button"
-      title="Delete"
-      aria-label="Delete"
-      @click.stop="remove"
-    >
-      <svg viewBox="0 0 16 16" class="todo-item__delete-glyph" aria-hidden="true">
-        <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
-      </svg>
-    </button>
+      <button
+        v-if="!editing"
+        class="todo-item__note"
+        :class="{ '-has': hasNote }"
+        type="button"
+        :title="hasNote ? 'Open note' : 'Add note'"
+        aria-label="Note"
+        @click.stop="openNote"
+      >
+        <svg viewBox="0 0 16 16" class="todo-item__note-glyph" aria-hidden="true">
+          <rect x="3.5" y="2.5" width="9" height="11" rx="1.5" />
+          <path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" />
+        </svg>
+      </button>
 
-    <TaskMoveMenu
-      v-if="menu"
-      :item="item"
-      :x="menu.x"
-      :y="menu.y"
-      @close="closeMenu"
-      @note="openNote"
-      @focus="startFocus"
-    />
+      <button
+        v-if="!editing"
+        class="todo-item__delete"
+        type="button"
+        title="Delete"
+        aria-label="Delete"
+        @click.stop="remove"
+      >
+        <svg viewBox="0 0 16 16" class="todo-item__delete-glyph" aria-hidden="true">
+          <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
+        </svg>
+      </button>
+
+      <TaskMoveMenu
+        v-if="menu"
+        :item="item"
+        :x="menu.x"
+        :y="menu.y"
+        @close="closeMenu"
+        @note="openNote"
+        @focus="startFocus"
+      />
+    </div>
+
+    <section v-if="expanded" class="todo-item-queue">
+      <header class="todo-item-queue__head">
+        <span>任务队列</span>
+        <span v-if="queue" class="todo-item-queue__progress">已完成 {{ queue.completed }}/{{ queue.total }}</span>
+        <button
+          v-if="hasQueue"
+          class="todo-item-queue__delete-all"
+          type="button"
+          title="删除整条队列"
+          @click.stop="removeWholeQueue"
+        >删除全部</button>
+      </header>
+
+      <ol v-if="queue" class="todo-item-queue__list">
+        <li
+          v-for="(step, index) in queue.items"
+          :key="step.id"
+          class="todo-item-queue__step"
+          :class="{ '-done': step.done, '-current': queue.current.id === step.id }"
+        >
+          <button
+            class="todo-item-queue__check"
+            type="button"
+            role="checkbox"
+            :aria-checked="step.done"
+            @click.stop="toggleQueueItem(step)"
+          ><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" /></svg></button>
+          <span class="todo-item-queue__order">{{ index + 1 }}</span>
+          <span class="todo-item-queue__label" :title="labelText(step)"><template
+              v-for="(tag, tagIndex) in step.tags"
+              :key="`queue-tag-${tagIndex}`"
+            ><span
+                v-if="priorityLevel(tag)"
+                class="prio-badge"
+                :class="`-${priorityLevel(tag)}`"
+              >{{ priorityLevel(tag)?.toUpperCase() }}</span><span
+                v-else
+                class="tag-chip"
+                :style="{ '--tag-h': tagHue(tag) }"
+              >{{ '#' + tag }}</span></template><template
+              v-for="(segment, segmentIndex) in segmentsOf(step.text)"
+              :key="`queue-segment-${segmentIndex}`"
+            ><span
+                v-if="segment.kind === 'time'"
+                class="time-chip"
+                :class="{ '-cross': segment.time?.crossMidnight }"
+              >{{ segment.text }}</span><span
+                v-else-if="segment.text.trim()"
+                class="todo-item-queue__text"
+              >{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span>
+          <span v-if="queue.current.id === step.id && !step.done" class="todo-item-queue__now">当前</span>
+          <button
+            v-if="queue.total > 1"
+            class="todo-item-queue__remove"
+            type="button"
+            title="删除此步骤"
+            @click.stop="removeQueueItem(step)"
+          >×</button>
+        </li>
+      </ol>
+
+      <TodoItemInput
+        v-if="addingFollowUp"
+        ref="followUpAdder"
+        class="todo-item-queue__adder"
+        :list-id="item.listId"
+        :follow-up-for="item.id"
+        @blur-empty="addingFollowUp = false"
+      />
+      <button
+        v-else
+        class="todo-item-queue__add"
+        type="button"
+        @click.stop="startAddingFollowUp"
+      >＋ 添加后续任务</button>
+    </section>
   </div>
 </template>
 
 <style scoped>
+.todo-item-shell {
+  min-width: 0;
+}
+
 .todo-item {
   display: flex;
   align-items: center;
@@ -243,6 +387,7 @@ function closeMenu(): void {
 }
 
 .todo-item.-selected .todo-item__check,
+.todo-item.-selected .todo-item__queue-badge.-empty,
 .todo-item.-selected .todo-item__focus,
 .todo-item.-selected .todo-item__note,
 .todo-item.-selected .todo-item__delete {
@@ -382,6 +527,50 @@ function closeMenu(): void {
   opacity: 0.4;
 }
 
+.todo-item__queue-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.3rem;
+  padding: 0 0.3rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+  gap: 0.18rem;
+  visibility: visible;
+  color: var(--aside-text);
+}
+
+.todo-item__queue-badge svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.todo-item__queue-badge:hover,
+.todo-item__queue-badge.-open {
+  color: var(--highlight-text);
+  background: var(--button-active-bg);
+}
+
+.todo-item__queue-badge.-empty {
+  visibility: hidden;
+  padding: 0 0.38rem;
+  white-space: nowrap;
+}
+
+.todo-item:hover .todo-item__queue-badge.-empty {
+  visibility: visible;
+}
+
 .todo-item__note {
   flex: 0 0 auto;
   visibility: hidden;
@@ -486,6 +675,187 @@ function closeMenu(): void {
 
 .todo-item:hover .todo-item__delete {
   visibility: visible;
+}
+
+.todo-item-queue {
+  margin: 0.1rem 0.35rem 0.55rem 1.95rem;
+  overflow: hidden;
+  border: 1px solid var(--main-border-light);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-bg) 88%, var(--accent-soft));
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.06);
+}
+
+.todo-item-queue__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid var(--main-border-light);
+  color: var(--aside-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.todo-item-queue__progress {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.todo-item-queue__delete-all {
+  margin-left: auto;
+  padding: 0.15rem 0.3rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--disabled-text);
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.todo-item-queue__delete-all:hover {
+  background: var(--button-active-bg);
+  color: var(--highlight-text);
+}
+
+.todo-item-queue__list {
+  margin: 0;
+  padding: 0.2rem 0;
+  list-style: none;
+}
+
+.todo-item-queue__step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.9rem;
+  padding: 0.2rem 0.45rem;
+  color: var(--main-text);
+  font-size: 0.78rem;
+}
+
+.todo-item-queue__step.-current {
+  background: var(--accent-soft);
+}
+
+.todo-item-queue__step.-done {
+  color: var(--disabled-text);
+}
+
+.todo-item-queue__check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  padding: 0;
+  border: 1.3px solid var(--main-border-light);
+  border-radius: 4px;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+}
+
+.todo-item-queue__check svg {
+  width: 0.72rem;
+  height: 0.72rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.todo-item-queue__step.-done .todo-item-queue__check {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--main-bg);
+}
+
+.todo-item-queue__order {
+  flex: 0 0 auto;
+  width: 1rem;
+  color: var(--disabled-text);
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+.todo-item-queue__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-item-queue__label .tag-chip,
+.todo-item-queue__label .prio-badge,
+.todo-item-queue__label .time-chip {
+  margin-right: 0.35rem;
+}
+
+.todo-item-queue__step.-done .todo-item-queue__label {
+  text-decoration: line-through;
+}
+
+.todo-item-queue__now {
+  flex: 0 0 auto;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--highlight-text);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.todo-item-queue__remove {
+  flex: 0 0 auto;
+  visibility: hidden;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--disabled-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.todo-item-queue__step:hover .todo-item-queue__remove {
+  visibility: visible;
+}
+
+.todo-item-queue__remove:hover {
+  background: var(--button-active-bg);
+  color: var(--highlight-text);
+}
+
+.todo-item-queue__adder {
+  padding: 0 0.45rem;
+  border-top: 1px solid var(--main-border-light);
+}
+
+.todo-item-queue__add {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  border-top: 1px solid var(--main-border-light);
+  background: transparent;
+  color: var(--aside-text);
+  font: inherit;
+  font-size: 0.72rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.todo-item-queue__add:hover {
+  background: var(--button-active-bg);
+  color: var(--highlight-text);
 }
 
 /* Priority tags (#p0/#p1/#p2): a matching left accent strip on the row. The
